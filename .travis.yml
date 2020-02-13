@@ -9,4 +9,4 @@ cache:
   directories:
   - $HOME/.m2
 
-install: mvn clean install -s settings.xml -DskipTests=true
+install: mvn clean install -q -s settings.xml -DskipTests=true
