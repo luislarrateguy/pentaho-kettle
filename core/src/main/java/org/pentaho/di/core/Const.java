@@ -3,7 +3,7 @@
  *
  * Pentaho Data Integration
  *
- * Copyright (C) 2002-2018 by Hitachi Vantara : http://www.pentaho.com
+ * Copyright (C) 2002-2020 by Hitachi Vantara : http://www.pentaho.com
  *
  *******************************************************************************
  *
@@ -37,6 +37,7 @@ import org.pentaho.di.version.BuildVersion;
 import java.awt.Font;
 import java.awt.GraphicsEnvironment;
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
@@ -47,6 +48,7 @@ import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.nio.file.Paths;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.text.NumberFormat;
@@ -280,7 +282,7 @@ public class Const {
   /**
    * The default locale for the kettle environment (system defined)
    */
-  public static final Locale DEFAULT_LOCALE = Locale.getDefault(); // new Locale("nl", "BE");
+  public static final Locale DEFAULT_LOCALE = Locale.getDefault();
 
   /**
    * The default decimal separator . or ,
@@ -492,8 +494,11 @@ public class Const {
    * */
   public static final String[] DEPRECATED_VARIABLES = new String[] {
     Const.INTERNAL_VARIABLE_TRANSFORMATION_FILENAME_DIRECTORY,
-    Const.INTERNAL_VARIABLE_TRANSFORMATION_FILENAME_NAME, Const.INTERNAL_VARIABLE_TRANSFORMATION_NAME,
-    Const.INTERNAL_VARIABLE_TRANSFORMATION_REPOSITORY_DIRECTORY
+    Const.INTERNAL_VARIABLE_TRANSFORMATION_FILENAME_NAME,
+    Const.INTERNAL_VARIABLE_TRANSFORMATION_REPOSITORY_DIRECTORY,
+    Const.INTERNAL_VARIABLE_JOB_FILENAME_DIRECTORY,
+    Const.INTERNAL_VARIABLE_JOB_FILENAME_NAME,
+    Const.INTERNAL_VARIABLE_JOB_REPOSITORY_DIRECTORY
   };
 
   /** The transformation filename directory */
@@ -574,6 +579,8 @@ public class Const {
   public static final int SHOW_MESSAGE_DIALOG_DB_TEST_DEFAULT = 0;
 
   public static final int SHOW_MESSAGE_DIALOG_DB_TEST_SUCCESS = 1;
+
+  public static final int SHOW_FATAL_ERROR = 2;
 
   /**
    * The margin between the text of a note and its border.
@@ -918,6 +925,7 @@ public class Const {
   /**
    * The XML file that contains the list of native Kettle two-way password encoder plugins
    */
+  @SuppressWarnings( "squid:S2068" )
   public static final String XML_FILE_KETTLE_PASSWORD_ENCODER_PLUGINS = "kettle-password-encoder-plugins.xml";
 
   /**
@@ -929,17 +937,20 @@ public class Const {
   /**
    * Specifies the password encoding plugin to use by ID (Kettle is the default).
    */
+  @SuppressWarnings( "squid:S2068" )
   public static final String KETTLE_PASSWORD_ENCODER_PLUGIN = "KETTLE_PASSWORD_ENCODER_PLUGIN";
 
   /**
    * The name of the environment variable that will contain the alternative location of the kettle-password-encoder-plugins.xml
    * file
    */
+  @SuppressWarnings( "squid:S2068" )
   public static final String KETTLE_PASSWORD_ENCODER_PLUGINS_FILE = "KETTLE_PASSWORD_ENCODER_PLUGINS_FILE";
 
   /**
    * The name of the Kettle encryption seed environment variable for the KettleTwoWayPasswordEncoder class
    */
+  @SuppressWarnings( "squid:S2068" )
   public static final String KETTLE_TWO_WAY_PASSWORD_ENCODER_SEED = "KETTLE_TWO_WAY_PASSWORD_ENCODER_SEED";
 
   /**
@@ -1003,6 +1014,7 @@ public class Const {
   /**
    * Set this variable to with the intended password to pass as repository credentials
    */
+  @SuppressWarnings( "squid:S2068" )
   public static final String KETTLE_PASSWORD = "KETTLE_PASSWORD";
 
   /**
@@ -1124,6 +1136,9 @@ public class Const {
   // See PDI-17203 for details
   public static final String KETTLE_COMPATIBILITY_XML_OUTPUT_NULL_VALUES = "KETTLE_COMPATIBILITY_XML_OUTPUT_NULL_VALUES";
 
+  // See PDI-17980 for details
+  public static final String KETTLE_COMPATIBILITY_USE_JDBC_METADATA = "KETTLE_COMPATIBILITY_USE_JDBC_METADATA";
+
   /**
    * The XML file that contains the list of native import rules
    */
@@ -1188,6 +1203,142 @@ public class Const {
    * {@linkplain org.apache.commons.vfs2.provider.sftp.SftpFileSystemConfigBuilder#USER_DIR_IS_ROOT}
    */
   public static final String VFS_USER_DIR_IS_ROOT = "vfs.sftp.userDirIsRoot";
+
+  /**
+   * <p>A variable to configure the minimum allowed ratio between de- and inflated bytes to detect a zipbomb.</p>
+   * <p>If not set or if the configured value is invalid, it defaults to {@value
+   * #KETTLE_ZIP_MIN_INFLATE_RATIO_DEFAULT}</p>
+   * <p>Check PDI-17586 for more details.</p>
+   *
+   * @see #KETTLE_ZIP_MIN_INFLATE_RATIO_DEFAULT
+   * @see #KETTLE_ZIP_MIN_INFLATE_RATIO_DEFAULT_STRING
+   */
+  public static final String KETTLE_ZIP_MIN_INFLATE_RATIO = "KETTLE_ZIP_MIN_INFLATE_RATIO";
+
+  /**
+   * <p>The default value for the {@link #KETTLE_ZIP_MIN_INFLATE_RATIO} as a Double.</p>
+   * <p>Check PDI-17586 for more details.</p>
+   *
+   * @see #KETTLE_ZIP_MIN_INFLATE_RATIO
+   * @see #KETTLE_ZIP_MIN_INFLATE_RATIO_DEFAULT_STRING
+   */
+  public static final Double KETTLE_ZIP_MIN_INFLATE_RATIO_DEFAULT = 0.01d;
+
+  /**
+   * <p>The default value for the {@link #KETTLE_ZIP_MIN_INFLATE_RATIO} as a String.</p>
+   * <p>Check PDI-17586 for more details.</p>
+   *
+   * @see #KETTLE_ZIP_MIN_INFLATE_RATIO
+   * @see #KETTLE_ZIP_MIN_INFLATE_RATIO_DEFAULT
+   */
+  public static final String KETTLE_ZIP_MIN_INFLATE_RATIO_DEFAULT_STRING =
+    String.valueOf( KETTLE_ZIP_MIN_INFLATE_RATIO_DEFAULT );
+
+  /**
+   * <p>A variable to configure the maximum file size of a single zip entry.</p>
+   * <p>If not set or if the configured value is invalid, it defaults to {@value #KETTLE_ZIP_MAX_ENTRY_SIZE_DEFAULT}</p>
+   * <p>Check PDI-17586 for more details.</p>
+   *
+   * @see #KETTLE_ZIP_MAX_ENTRY_SIZE_DEFAULT
+   * @see #KETTLE_ZIP_MAX_ENTRY_SIZE_DEFAULT_STRING
+   */
+  public static final String KETTLE_ZIP_MAX_ENTRY_SIZE = "KETTLE_ZIP_MAX_ENTRY_SIZE";
+
+  /**
+   * <p>The default value for the {@link #KETTLE_ZIP_MAX_ENTRY_SIZE} as a Long.</p>
+   * <p>Check PDI-17586 for more details.</p>
+   *
+   * @see #KETTLE_ZIP_MAX_ENTRY_SIZE
+   * @see #KETTLE_ZIP_MAX_ENTRY_SIZE_DEFAULT_STRING
+   */
+  public static final Long KETTLE_ZIP_MAX_ENTRY_SIZE_DEFAULT = 0xFFFFFFFFL;
+
+  /**
+   * <p>The default value for the {@link #KETTLE_ZIP_MAX_ENTRY_SIZE} as a String.</p>
+   * <p>Check PDI-17586 for more details.</p>
+   *
+   * @see #KETTLE_ZIP_MAX_ENTRY_SIZE
+   * @see #KETTLE_ZIP_MAX_ENTRY_SIZE_DEFAULT
+   */
+  public static final String KETTLE_ZIP_MAX_ENTRY_SIZE_DEFAULT_STRING =
+    String.valueOf( KETTLE_ZIP_MAX_ENTRY_SIZE_DEFAULT );
+
+  /**
+   * <p>A variable to configure the maximum number of characters of text that are extracted before an exception is
+   * thrown during extracting text from documents.</p>
+   * <p>If not set or if the configured value is invalid, it defaults to {@value #KETTLE_ZIP_MAX_TEXT_SIZE_DEFAULT}</p>
+   * <p>Check PDI-17586 for more details.</p>
+   *
+   * @see #KETTLE_ZIP_MAX_TEXT_SIZE_DEFAULT
+   * @see #KETTLE_ZIP_MAX_TEXT_SIZE_DEFAULT_STRING
+   */
+  public static final String KETTLE_ZIP_MAX_TEXT_SIZE = "KETTLE_ZIP_MAX_TEXT_SIZE";
+
+  /**
+   * <p>The default value for the {@link #KETTLE_ZIP_MAX_TEXT_SIZE} as a Long.</p>
+   * <p>Check PDI-17586 for more details.</p>
+   *
+   * @see #KETTLE_ZIP_MAX_TEXT_SIZE
+   * @see #KETTLE_ZIP_MAX_TEXT_SIZE_DEFAULT_STRING
+   */
+  public static final Long KETTLE_ZIP_MAX_TEXT_SIZE_DEFAULT = 10 * 1024 * 1024L;
+
+  /**
+   * <p>The default value for the {@link #KETTLE_ZIP_MAX_TEXT_SIZE} as a Long.</p>
+   * <p>Check PDI-17586 for more details.</p>
+   *
+   * @see #KETTLE_ZIP_MAX_TEXT_SIZE
+   * @see #KETTLE_ZIP_MAX_TEXT_SIZE_DEFAULT
+   */
+  public static final String KETTLE_ZIP_MAX_TEXT_SIZE_DEFAULT_STRING =
+    String.valueOf( KETTLE_ZIP_MAX_TEXT_SIZE_DEFAULT );
+
+  /**
+   * <p>A variable to configure if the S3 input / output steps should use the Amazon Default Credentials Provider Chain
+   * even if access credentials are specified within the transformation.</p>
+   */
+  public static final String KETTLE_USE_AWS_DEFAULT_CREDENTIALS = "KETTLE_USE_AWS_DEFAULT_CREDENTIALS";
+
+  /**
+   * <p>This environment variable is used by streaming consumer steps to limit the total of concurrent batches across transformations.</p>
+   */
+  public static final String SHARED_STREAMING_BATCH_POOL_SIZE = "SHARED_STREAMING_BATCH_POOL_SIZE";
+
+  /**
+   * <p>This environment variable is used to specify a location used to deploy a shim driver into PDI.</p>
+   */
+  public static final String SHIM_DRIVER_DEPLOYMENT_LOCATION = "SHIM_DRIVER_DEPLOYMENT_LOCATION";
+  private static final String DEFAULT_DRIVERS_DIR = "DEFAULT";
+  public static String getShimDriverDeploymentLocation() {
+
+    String driversLocation = System.getProperty( Const.SHIM_DRIVER_DEPLOYMENT_LOCATION, DEFAULT_DRIVERS_DIR );
+    if ( driversLocation.equals( DEFAULT_DRIVERS_DIR ) ) {
+      String karafDir = System.getProperty( "karaf.home" );
+      return Paths.get( karafDir ).getParent().getParent().toString() + File.separator + "drivers";
+    }
+    return driversLocation;
+  }
+
+  /**
+   * <p>This environment variable is used by XSD validation steps to enable or disable external entities.</p>
+   * <p>By default external entities are allowed.</p>
+   */
+  public static final String ALLOW_EXTERNAL_ENTITIES_FOR_XSD_VALIDATION = "ALLOW_EXTERNAL_ENTITIES_FOR_XSD_VALIDATION";
+  public static final String ALLOW_EXTERNAL_ENTITIES_FOR_XSD_VALIDATION_DEFAULT = "true";
+
+  /**
+   * <p>This environment variable is used to define the default division result precision between BigDecimals.</p>
+   * <p>By default, and when precision is -1, precision is unlimited.</p>
+   */
+  public static final String KETTLE_BIGDECIMAL_DIVISION_PRECISION = "KETTLE_BIGDECIMAL_DIVISION_PRECISION";
+  public static final String KETTLE_BIGDECIMAL_DIVISION_PRECISION_DEFAULT = "-1";
+
+  /**
+   * <p>This environment variable is used to define the default division result rounding mode between BigDecimals.</p>
+   * <p>By default, rouding mode is half even.</p>
+   */
+  public static final String KETTLE_BIGDECIMAL_DIVISION_ROUNDING_MODE = "KETTLE_BIGDECIMAL_DIVISION_ROUNDING_MODE";
+  public static final String KETTLE_BIGDECIMAL_DIVISION_ROUNDING_MODE_DEFAULT = "HALF_EVEN";
 
   /**
    * rounds double f to any number of places after decimal point Does arithmetic using BigDecimal class to avoid integer
@@ -2110,7 +2261,6 @@ public class Const {
           if ( newval != null ) {
             // Replace the whole bunch
             str.replace( idx, to + 2, newval );
-            // System.out.println("Replaced ["+marker+"] with ["+newval+"]");
 
             // The last position has changed...
             to += newval.length() - marker.length();
@@ -2316,7 +2466,7 @@ public class Const {
       if ( string.substring( i, i + sepLen ).equalsIgnoreCase( separator ) ) {
         // OK, we found a separator, the string to add to the list
         // is [from, i[
-        list.add( NVL( string.substring( from, i ), "" ) );
+        list.add( nullToEmpty( string.substring( from, i ) ) );
         from = i + sepLen;
       }
     }
@@ -2324,7 +2474,7 @@ public class Const {
     // Wait, if the string didn't end with a separator, we still have information at the end of the string...
     // In our example that would be "d"...
     if ( from + sepLen <= string.length() ) {
-      list.add( NVL( string.substring( from, string.length() ), "" ) );
+      list.add( nullToEmpty( string.substring( from, string.length() ) ) );
     }
 
     return list.toArray( new String[list.size()] );
@@ -2384,7 +2534,7 @@ public class Const {
       if ( found ) {
         // OK, we found a separator, the string to add to the list
         // is [from, i[
-        list.add( NVL( string.substring( from, i ), "" ) );
+        list.add( nullToEmpty( string.substring( from, i ) ) );
         from = i + 1;
       }
     }
@@ -2392,7 +2542,7 @@ public class Const {
     // Wait, if the string didn't end with a separator, we still have information at the end of the string...
     // In our example that would be "d"...
     if ( from + 1 <= string.length() ) {
-      list.add( NVL( string.substring( from, string.length() ), "" ) );
+      list.add( nullToEmpty( string.substring( from, string.length() ) ) );
     }
 
     return list.toArray( new String[list.size()] );
@@ -2678,7 +2828,7 @@ public class Const {
    *          The value to check
    * @return true if the string supplied is empty
    * @deprecated
-   * @see org.pentaho.di.core.util.Utils.isEmpty
+   * @see org.pentaho.di.core.util.Utils#isEmpty(CharSequence)
    */
   @Deprecated
   public static boolean isEmpty( String val ) {
@@ -2688,11 +2838,11 @@ public class Const {
   /**
    * Check if the stringBuffer supplied is empty. A StringBuffer is empty when it is null or when the length is 0
    *
-   * @param string
+   * @param val
    *          The stringBuffer to check
    * @return true if the stringBuffer supplied is empty
    * @deprecated
-   * @see org.pentaho.di.core.util.Utils.isEmpty
+   * @see org.pentaho.di.core.util.Utils#isEmpty(CharSequence)
    */
   @Deprecated
   public static boolean isEmpty( StringBuffer val ) {
@@ -2703,11 +2853,11 @@ public class Const {
    * Check if the string array supplied is empty. A String array is empty when it is null or when the number of elements
    * is 0
    *
-   * @param strings
+   * @param vals
    *          The string array to check
    * @return true if the string array supplied is empty
    * @deprecated
-   * @see org.pentaho.di.core.util.Utils.isEmpty
+   * @see org.pentaho.di.core.util.Utils#isEmpty(CharSequence[])
    */
   @Deprecated
   public static boolean isEmpty( String[] vals ) {
@@ -2717,11 +2867,11 @@ public class Const {
   /**
    * Check if the CharSequence supplied is empty. A CharSequence is empty when it is null or when the length is 0
    *
-   * @param string
+   * @param val
    *          The stringBuffer to check
    * @return true if the stringBuffer supplied is empty
    * @deprecated
-   * @see org.pentaho.di.core.util.Utils.isEmpty
+   * @see org.pentaho.di.core.util.Utils#isEmpty(CharSequence)
    */
   @Deprecated
   public static boolean isEmpty( CharSequence val ) {
@@ -2732,11 +2882,11 @@ public class Const {
    * Check if the CharSequence array supplied is empty. A CharSequence array is empty when it is null or when the number of elements
    * is 0
    *
-   * @param strings
+   * @param vals
    *          The string array to check
    * @return true if the string array supplied is empty
    * @deprecated
-   * @see org.pentaho.di.core.util.Utils.isEmpty
+   * @see org.pentaho.di.core.util.Utils#isEmpty(CharSequence[])
    */
   @Deprecated
   public static boolean isEmpty( CharSequence[] vals ) {
@@ -2750,7 +2900,7 @@ public class Const {
    *          The array to check
    * @return true if the array supplied is empty
    * @deprecated
-   * @see org.pentaho.di.core.util.Utils.isEmpty
+   * @see org.pentaho.di.core.util.Utils#isEmpty(Object[])
    */
   @Deprecated
   public static boolean isEmpty( Object[] array ) {
@@ -2764,7 +2914,7 @@ public class Const {
    *          the list to check
    * @return true if the supplied list is empty
    * @deprecated
-   * @see org.pentaho.di.core.util.Utils.isEmpty
+   * @see org.pentaho.di.core.util.Utils#isEmpty(List)
    */
   @Deprecated
   public static boolean isEmpty( List<?> list ) {
@@ -2916,7 +3066,6 @@ public class Const {
         return sFullPath;
       }
     }
-
   }
 
   /**
@@ -3326,32 +3475,32 @@ public class Const {
    *          the date
    * @param time
    *          the time to add (in string)
-   * @param DateFormat
+   * @param dateFormat
    *          the time format
    * @return date = input + time
    */
-  public static Date addTimeToDate( Date input, String time, String DateFormat ) throws Exception {
+  public static Date addTimeToDate( Date input, String time, String dateFormat ) throws Exception {
     if ( Utils.isEmpty( time ) ) {
       return input;
     }
     if ( input == null ) {
       return null;
     }
-    String dateformatString = NVL( DateFormat, "HH:mm:ss" );
+    String dateformatString = NVL( dateFormat, "HH:mm:ss" );
     int t = decodeTime( time, dateformatString );
     return new Date( input.getTime() + t );
   }
 
   // Decodes a time value in specified date format and returns it as milliseconds since midnight.
-  public static int decodeTime( String s, String DateFormat ) throws Exception {
-    SimpleDateFormat f = new SimpleDateFormat( DateFormat );
+  public static int decodeTime( String s, String dateFormat ) throws Exception {
+    SimpleDateFormat f = new SimpleDateFormat( dateFormat );
     TimeZone utcTimeZone = TimeZone.getTimeZone( "UTC" );
     f.setTimeZone( utcTimeZone );
     f.setLenient( false );
     ParsePosition p = new ParsePosition( 0 );
     Date d = f.parse( s, p );
     if ( d == null ) {
-      throw new Exception( "Invalid time value " + DateFormat + ": \"" + s + "\"." );
+      throw new Exception( "Invalid time value " + dateFormat + ": \"" + s + "\"." );
     }
     return (int) d.getTime();
   }

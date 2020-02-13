@@ -2,7 +2,7 @@
  *
  * Pentaho Data Integration
  *
- * Copyright (C) 2002-2018 by Hitachi Vantara : http://www.pentaho.com
+ * Copyright (C) 2002-2019 by Hitachi Vantara : http://www.pentaho.com
  *
  *******************************************************************************
  *
@@ -27,7 +27,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
+import org.apache.commons.lang.StringUtils;
 import org.pentaho.di.core.Const;
 import org.pentaho.di.core.exception.KettleException;
 import org.pentaho.di.core.exception.KettleFileException;
@@ -283,6 +286,48 @@ public class TextFileInputUtils {
       StringBuilder line ) throws KettleFileException {
     EncodingType type = EncodingType.guessEncodingType( reader.getEncoding() );
     return getLine( log, reader, type, formatNr, line );
+  }
+
+  public static final String getLine( LogChannelInterface log, InputStreamReader reader, EncodingType encodingType,
+                                      int fileFormatType, StringBuilder line, String regex )
+    throws KettleFileException {
+
+    return getLine( log, reader, encodingType, fileFormatType, line, regex, 0 ).line;
+
+  }
+
+  /**
+   *
+   * Returns in the first position a line; ;
+   * on the second position how many lines from file were read to get a full line
+   *
+   */
+  public static final TextFileLine getLine( LogChannelInterface log, InputStreamReader reader, EncodingType encodingType,
+                                      int fileFormatType, StringBuilder line, String regex, long lineNumberInFile )
+    throws KettleFileException {
+
+    String sline = getLine( log, reader, encodingType, fileFormatType, line );
+
+    while ( sline != null ) {
+    /*
+    Check that the number of enclosures in a line is even.
+    If not even it means that there was an enclosed line break.
+    We need to read the next line(s) to get the remaining data in this row.
+    */
+      if ( checkPattern( sline, regex ) % 2 == 0 ) {
+        return new TextFileLine( sline, lineNumberInFile, null );
+      }
+
+      String nextLine = getLine( log, reader, encodingType, fileFormatType, line );
+
+      if ( nextLine == null ) {
+        break;
+      }
+
+      sline = sline + nextLine;
+      lineNumberInFile++;
+    }
+    return new TextFileLine( sline, lineNumberInFile, null );
   }
 
   public static final String getLine( LogChannelInterface log, InputStreamReader reader, EncodingType encodingType,
@@ -706,14 +751,36 @@ public class TextFileInputUtils {
               next = line.indexOf( delimiter, startpoint );
 
               // See if this position is preceded by an escape character.
-              if ( len_esc > 0 && next - len_esc > 0 ) {
+              if ( len_esc > 0 && next > 0 ) {
                 String before = line.substring( next - len_esc, next );
 
                 if ( inf.content.escapeCharacter.equals( before ) ) {
-                  // take the next separator, this one is escaped...
-                  startpoint = next + 1;
-                  // tries++;
-                  contains_escaped_separators = true;
+                  int previous_escapes = 1;
+
+                  int start = next - len_esc - 1;
+                  int end = next - 1;
+
+                  while ( start >= 0 ) {
+                    if ( inf.content.escapeCharacter.equals( line.substring( start, end ) ) ) {
+                      previous_escapes++;
+                      start--;
+                      end--;
+                    } else {
+                      break;
+                    }
+                  }
+
+                  // If behind the seperator there are a odd number of escaped
+                  // The separator is escaped.
+                  if ( previous_escapes % 2 != 0 ) {
+                    // take the next separator, this one is escaped...
+                    startpoint = next + 1;
+                    // tries++;
+                    contains_escaped_separators = true;
+                  } else {
+                    found = true;
+                  }
+
                 } else {
                   found = true;
                 }
@@ -767,6 +834,7 @@ public class TextFileInputUtils {
           }
 
           // replace the escaped escape with escape...
+          contains_escaped_escape = pol.contains( inf.content.escapeCharacter + inf.content.escapeCharacter );
           if ( contains_escaped_escape ) {
             String replace = inf.content.escapeCharacter + inf.content.escapeCharacter;
             String replaceWith = inf.content.escapeCharacter;
@@ -850,5 +918,51 @@ public class TextFileInputUtils {
     }
 
     return strings;
+  }
+
+  /**
+   * Finds a pattern within a String returning the occurrences number
+   *
+   * @param text String to be evaluated
+   * @param regex String pattern
+   * @return pattern occurrences number
+   */
+  public static int checkPattern( String text, String regex ) {
+
+    int matches = 0;
+
+    if ( StringUtils.isBlank( text ) || StringUtils.isBlank( regex ) ) {
+      return matches;
+    }
+
+    Pattern pattern = Pattern.compile( regex );
+    Matcher matcher = pattern.matcher( text );
+
+    while ( matcher.find() ) {
+      matches++;
+    }
+
+    return matches;
+  }
+
+  /**
+   *
+   * Returns the line number in file
+   *
+   */
+
+  public static long skipLines( LogChannelInterface log, InputStreamReader reader, EncodingType encodingType,
+                                int fileFormatType, StringBuilder line, int nrLinesToSkip,
+                                String regex, long lineNumberInFile ) throws KettleFileException {
+
+    TextFileLine textFileLine = getLine( log, reader, encodingType, fileFormatType, line, regex, lineNumberInFile );
+    int skipped = 1;
+
+    while ( textFileLine.line != null && skipped < nrLinesToSkip ) {
+      textFileLine = getLine( log, reader, encodingType, fileFormatType, line, regex, textFileLine.lineNumber );
+      skipped++;
+    }
+
+    return textFileLine.lineNumber;
   }
 }

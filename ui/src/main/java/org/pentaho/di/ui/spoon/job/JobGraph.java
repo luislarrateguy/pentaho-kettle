@@ -3,7 +3,7 @@
  *
  * Pentaho Data Integration
  *
- * Copyright (C) 2002-2018 by Hitachi Vantara : http://www.pentaho.com
+ * Copyright (C) 2002-2019 by Hitachi Vantara : http://www.pentaho.com
  *
  *******************************************************************************
  *
@@ -1571,7 +1571,7 @@ public class JobGraph extends AbstractGraph implements XulEventHandler, Redrawab
 
   public boolean setFocus() {
     xulDomContainer.addEventHandler( this );
-    return canvas.setFocus();
+    return super.setFocus();
   }
 
   /**
@@ -2441,8 +2441,13 @@ public class JobGraph extends AbstractGraph implements XulEventHandler, Redrawab
               tip.append( "-" );
             }
             tip.append( Const.CR ).append( tipNext ).append( Const.CR );
-            tip.append( BaseMessages.getString( PKG, "JobGraph.DeprecatedEntry.Tooltip.Message2",
-              jec.getSuggestion() ) );
+            tip.append( BaseMessages.getString( PKG, "JobGraph.DeprecatedEntry.Tooltip.Message2" ) );
+            if ( !Utils.isEmpty( jec.getSuggestion() )
+              && !( jec.getSuggestion().startsWith( "!" ) && jec.getSuggestion().endsWith( "!" ) ) ) {
+              tip.append( " " );
+              tip.append( BaseMessages.getString( PKG, "JobGraph.DeprecatedEntry.Tooltip.Message3",
+                jec.getSuggestion() ) );
+            }
             tipImage = GUIResource.getInstance().getImageDeprecated();
           }
           break;
@@ -3460,7 +3465,7 @@ public class JobGraph extends AbstractGraph implements XulEventHandler, Redrawab
 
     // If the job is not running, start the transformation...
     //
-    if ( job == null || job.isFinished() && !job.isActive() ) {
+    if ( job == null || ( job.isFinished() || job.isStopped() ) && !job.isActive() ) {
       // Auto save feature...
       //
       handleJobMetaChanges( jobMeta );

@@ -31,10 +31,12 @@ define([
   "./components/error/error.component",
   "./components/message/message.component",
   "./components/tree/tree.component",
-  "core-ui/components/search/search.component",
+  "pentaho/di/ui/core/components/search/search.component",
   "./services/data.service",
-  "./filters/output.filter"
-], function(angular, appComponent, errorComponent, messageComponent, treeComponent, searchComponent, dataService, outputFilter) {
+  "./filters/output.filter",
+  "./directives/resize.directive",
+  './app.config'
+], function(angular, appComponent, errorComponent, messageComponent, treeComponent, searchComponent, dataService, outputFilter, resizeDirective, appConfig) {
   "use strict";
 
   var module = {
@@ -59,7 +61,9 @@ define([
       .component(treeComponent.name, treeComponent.options)
       .component(searchComponent.name, searchComponent.options)
       .service(dataService.name, dataService.factory)
-      .filter(outputFilter.name, outputFilter.factory);
+      .filter(outputFilter.name, outputFilter.factory)
+      .directive(resizeDirective.name, resizeDirective.options)
+      .config(appConfig);
   }
 
   /**

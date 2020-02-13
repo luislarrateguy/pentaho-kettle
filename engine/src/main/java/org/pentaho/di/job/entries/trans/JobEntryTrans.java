@@ -2,7 +2,7 @@
  *
  * Pentaho Data Integration
  *
- * Copyright (C) 2002-2018 by Hitachi Vantara : http://www.pentaho.com
+ * Copyright (C) 2002-2019 by Hitachi Vantara : http://www.pentaho.com
  *
  *******************************************************************************
  *
@@ -88,6 +88,7 @@ import org.w3c.dom.Node;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.List;
 import java.util.Map;
@@ -100,6 +101,7 @@ import java.util.Map;
  */
 public class JobEntryTrans extends JobEntryBase implements Cloneable, JobEntryInterface, HasRepositoryDirectories, JobEntryRunConfigurableInterface {
   private static Class<?> PKG = JobEntryTrans.class; // for i18n purposes, needed by Translator2!!
+  public static final int IS_PENTAHO = 1;
 
   private String transname;
 
@@ -896,13 +898,26 @@ public class JobEntryTrans extends JobEntryBase implements Cloneable, JobEntryIn
         SlaveServer remoteSlaveServer = null;
         TransExecutionConfiguration executionConfiguration = new TransExecutionConfiguration();
         if ( !Utils.isEmpty( runConfiguration ) ) {
-          log.logBasic( BaseMessages.getString( PKG, "JobTrans.RunConfig.Message" ), runConfiguration );
           runConfiguration = environmentSubstitute( runConfiguration );
+          log.logBasic( BaseMessages.getString( PKG, "JobTrans.RunConfig.Message" ), runConfiguration );
           executionConfiguration.setRunConfiguration( runConfiguration );
           try {
             ExtensionPointHandler.callExtensionPoint( log, KettleExtensionPoint.SpoonTransBeforeStart.id, new Object[] {
               executionConfiguration, parentJob.getJobMeta(), transMeta, rep
             } );
+            List<Object> items = Arrays.asList( runConfiguration, false );
+            try {
+              ExtensionPointHandler.callExtensionPoint( log, KettleExtensionPoint
+                      .RunConfigurationSelection.id, items );
+              if ( waitingToFinish && (Boolean) items.get( IS_PENTAHO ) ) {
+                String jobName = parentJob.getJobMeta().getName();
+                String name = transMeta.getName();
+                logBasic( BaseMessages.getString( PKG, "JobTrans.Log.InvalidRunConfigurationCombination", jobName,
+                        name, jobName ) );
+              }
+            } catch ( Exception ignored ) {
+              // Ignored
+            }
             if ( !executionConfiguration.isExecutingLocally() && !executionConfiguration.isExecutingRemotely() && !executionConfiguration.isExecutingClustered() ) {
               result.setResult( true );
               return result;
@@ -1184,16 +1199,7 @@ public class JobEntryTrans extends JobEntryBase implements Cloneable, JobEntryIn
               trans.stopAll();
               result.setNrErrors( 1 );
             }
-            Result newResult = trans.getResult();
-
-            result.clear(); // clear only the numbers, NOT the files or rows.
-            result.add( newResult );
-
-            // Set the result rows too, if any ...
-            if ( !Utils.isEmpty( newResult.getRows() ) ) {
-              result.setRows( newResult.getRows() );
-            }
-
+            updateResult( result );
             if ( setLogfile ) {
               ResultFile resultFile =
                 new ResultFile(
@@ -1247,6 +1253,15 @@ public class JobEntryTrans extends JobEntryBase implements Cloneable, JobEntryIn
     return result;
   }
 
+  protected void updateResult( Result result ) {
+    Result newResult = trans.getResult();
+    result.clear(); // clear only the numbers, NOT the files or rows.
+    result.add( newResult );
+    if ( !Utils.isEmpty( newResult.getRows() ) || trans.isResultRowsSet() ) {
+      result.setRows( newResult.getRows() );
+    }
+  }
+
   /**
    * @deprecated use {@link #getTransMeta(Repository, IMetaStore, VariableSpace)}
    * @param rep
@@ -1262,6 +1277,10 @@ public class JobEntryTrans extends JobEntryBase implements Cloneable, JobEntryIn
   private TransMeta getTransMetaFromRepository( Repository rep, CurrentDirectoryResolver r, String transPath ) throws KettleException {
     String realTransName = "";
     String realDirectory = "/";
+
+    if ( StringUtils.isBlank( transPath ) ) {
+      throw new KettleException( BaseMessages.getString( PKG, "JobTrans.Exception.MissingTransFileName" ) );
+    }
 
     int index = transPath.lastIndexOf( RepositoryFile.SEPARATOR );
     if ( index != -1 ) {
@@ -1291,7 +1310,7 @@ public class JobEntryTrans extends JobEntryBase implements Cloneable, JobEntryIn
           } catch ( KettleException e ) {
             // try to load from repository, this trans may have been developed locally and later uploaded to the
             // repository
-            transMeta = getTransMetaFromRepository( rep, r, realFilename );
+            transMeta = rep == null ? new TransMeta( realFilename, metaStore, null, true, this, null ) : getTransMetaFromRepository( rep, r, realFilename );
           }
           break;
         case REPOSITORY_BY_NAME:
@@ -1334,7 +1353,7 @@ public class JobEntryTrans extends JobEntryBase implements Cloneable, JobEntryIn
         //  When the child parameter does exist in the parent parameters, overwrite the child parameter by the
         // parent parameter.
 
-        StepWithMappingMeta.replaceVariableValues( transMeta, space );
+        StepWithMappingMeta.replaceVariableValues( transMeta, space, "Trans" );
         if ( isPassingAllParameters() ) {
           // All other parent parameters need to get copied into the child parameters  (when the 'Inherit all
           // variables from the transformation?' option is checked)
@@ -1676,6 +1695,14 @@ public class JobEntryTrans extends JobEntryBase implements Cloneable, JobEntryIn
       // Set fieldNameParameter only if exists and if it is not declared any staticValue( parameterValues array )
       //
       String thisValue = namedParam.getParameterValue( parameters[ idx ] );
+      // multiple executions on the same jobEntryTrans variableSpace need to be updated even for nulls or blank values.
+      // so we have to ask if that same variable had a value before and if it had - and the new value is empty -
+      // we should set it as a blank value instead of ignoring it.
+      // NOTE: we should only replace it if we have a parameterFieldNames defined -> parameterFieldNames[ idx ] ) != null
+      if ( !Utils.isEmpty( jobEntryTrans.getVariable( parameters[ idx ] ) ) && Utils.isEmpty( thisValue )
+        && idx < parameterFieldNames.length && !Utils.isEmpty( Const.trim( parameterFieldNames[ idx ] ) ) ) {
+        jobEntryTrans.setVariable( parameters[ idx ], "" );
+      }
       // Set value only if is not empty at namedParam and exists in parameterFieldNames
       if ( !Utils.isEmpty( thisValue ) && idx < parameterFieldNames.length ) {
         // If exists then ask if is not empty

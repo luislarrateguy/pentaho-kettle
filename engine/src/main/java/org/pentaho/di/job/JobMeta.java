@@ -3,7 +3,7 @@
  *
  * Pentaho Data Integration
  *
- * Copyright (C) 2002-2018 by Hitachi Vantara : http://www.pentaho.com
+ * Copyright (C) 2002-2019 by Hitachi Vantara : http://www.pentaho.com
  *
  *******************************************************************************
  *
@@ -1247,6 +1247,7 @@ public class JobMeta extends AbstractMeta
    */
   public void addJobEntry( int p, JobEntryCopy si ) {
     jobcopies.add( p, si );
+    si.setParentJobMeta( this );
     changedEntries = true;
   }
 
@@ -2358,13 +2359,15 @@ public class JobMeta extends AbstractMeta
     }
     updateCurrentDir();
   }
-
-  private void updateCurrentDir() {
+  // changed to protected for testing purposes
+  protected void updateCurrentDir() {
     String prevCurrentDir = variables.getVariable( Const.INTERNAL_VARIABLE_ENTRY_CURRENT_DIRECTORY );
     String currentDir = variables.getVariable(
       repository != null
           ? Const.INTERNAL_VARIABLE_JOB_REPOSITORY_DIRECTORY
-          : Const.INTERNAL_VARIABLE_JOB_FILENAME_DIRECTORY );
+          : filename != null
+            ? Const.INTERNAL_VARIABLE_JOB_FILENAME_DIRECTORY
+            : Const.INTERNAL_VARIABLE_ENTRY_CURRENT_DIRECTORY );
     variables.setVariable( Const.INTERNAL_VARIABLE_ENTRY_CURRENT_DIRECTORY, currentDir );
     fireCurrentDirectoryChanged( prevCurrentDir, currentDir );
   }
@@ -2408,9 +2411,15 @@ public class JobMeta extends AbstractMeta
       variables.setVariable( Const.INTERNAL_VARIABLE_JOB_FILENAME_NAME, "" );
     }
 
+    setInternalEntryCurrentDirectory();
+
+  }
+
+  protected void setInternalEntryCurrentDirectory() {
     variables.setVariable( Const.INTERNAL_VARIABLE_ENTRY_CURRENT_DIRECTORY, variables.getVariable(
-        repository != null ? Const.INTERNAL_VARIABLE_JOB_REPOSITORY_DIRECTORY
-            : Const.INTERNAL_VARIABLE_JOB_FILENAME_DIRECTORY ) );
+      repository != null ? Const.INTERNAL_VARIABLE_JOB_REPOSITORY_DIRECTORY
+        : filename != null ? Const.INTERNAL_VARIABLE_JOB_FILENAME_DIRECTORY
+        : Const.INTERNAL_VARIABLE_ENTRY_CURRENT_DIRECTORY ) );
   }
 
   @Deprecated
@@ -2542,9 +2551,8 @@ public class JobMeta extends AbstractMeta
         //
         Map<String, String> directoryMap = namingInterface.getDirectoryMap();
         if ( directoryMap != null ) {
-          for ( String directory : directoryMap.keySet() ) {
-            String parameterName = directoryMap.get( directory );
-            jobMeta.addParameterDefinition( parameterName, directory, "Data file path discovered during export" );
+          for ( Map.Entry<String, String> entry : directoryMap.entrySet() ) {
+            jobMeta.addParameterDefinition( entry.getValue(), entry.getKey(), "Data file path discovered during export" );
           }
         }
 

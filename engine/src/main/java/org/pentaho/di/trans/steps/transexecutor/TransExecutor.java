@@ -2,7 +2,7 @@
  *
  * Pentaho Data Integration
  *
- * Copyright (C) 2002-2018 by Hitachi Vantara : http://www.pentaho.com
+ * Copyright (C) 2002-2019 by Hitachi Vantara : http://www.pentaho.com
  *
  *******************************************************************************
  *
@@ -22,6 +22,7 @@
 
 package org.pentaho.di.trans.steps.transexecutor;
 
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.ArrayList;
@@ -119,7 +120,7 @@ public class TransExecutor extends BaseStep implements StepInterface {
           Object groupFieldData = row[ transExecutorData.groupFieldIndex ];
           if ( transExecutorData.prevGroupFieldData != null ) {
             if ( transExecutorData.groupFieldMeta.compare( transExecutorData.prevGroupFieldData, groupFieldData ) != 0 ) {
-              executeTransformation( incomingFieldValues );
+              executeTransformation( getLastIncomingFieldValues() );
             }
           }
           transExecutorData.prevGroupFieldData = groupFieldData;
@@ -208,9 +209,16 @@ public class TransExecutor extends BaseStep implements StepInterface {
 
     Trans executorTrans = createInternalTrans();
     transExecutorData.setExecutorTrans( executorTrans );
+    if ( incomingFieldValues != null ) {
+      // Pass parameter values
+      passParametersToTrans( incomingFieldValues );
+    } else {
+      List<String> lastIncomingFieldValues = getLastIncomingFieldValues();
+      // incomingFieldValues == null-  There are no more rows - Last Case - pass previous values if exists
+      // If not still pass the null parameter values
+      passParametersToTrans( lastIncomingFieldValues != null && !lastIncomingFieldValues.isEmpty() ? lastIncomingFieldValues : incomingFieldValues );
+    }
 
-    // Pass parameter values
-    passParametersToTrans( incomingFieldValues );
 
     // keep track for drill down in Spoon...
     getTrans().addActiveSubTransformation( getStepname(), executorTrans );
@@ -244,8 +252,6 @@ public class TransExecutor extends BaseStep implements StepInterface {
 
     if ( result.isSafeStop() ) {
       getTrans().safeStop();
-    } else if ( result.getNrErrors() > 0 ) {
-      getTrans().stopAll();
     }
 
     collectTransResults( result );
@@ -316,21 +322,43 @@ public class TransExecutor extends BaseStep implements StepInterface {
     List<String> staticInputs = Arrays.asList( parameters.getInput() );
 
     /////////////////////////////////////////////
-    //If "Fields to use" ARE provided.
-    for ( int i = 0; i < fieldsToUse.size(); i++ ) {
+    // For all parameters declared in transExecutor
+    for ( int i = 0; i < parameters.getVariable().length; i++ ) {
+      String currentVariableToUpdate = (String) resolvingValuesMap.keySet().toArray()[i];
+      boolean hasIncomingFieldValues = incomingFieldValues != null && !incomingFieldValues.isEmpty();
       try {
-        String value = null;
-        if ( incomingFields.contains( fieldsToUse.get( i ) )
-            && ( value = incomingFieldValues.get( incomingFields.indexOf( fieldsToUse.get( i ) ) ) ) != null ) {
-          //Set the value to the first parameter in the resolvingValuesMap.
-          resolvingValuesMap.put( (String) resolvingValuesMap.keySet().toArray()[i], value );
+        if ( i < fieldsToUse.size() && incomingFields.contains( fieldsToUse.get( i ) ) && hasIncomingFieldValues
+          && ( !Utils.isEmpty( Const.trim( incomingFieldValues.get( incomingFields.indexOf( fieldsToUse.get( i ) ) ) ) ) ) ) {
+          // if field to use is defined on previous steps ( incomingFields ) and is not empty - put that value
+          resolvingValuesMap.put( currentVariableToUpdate, incomingFieldValues.get( incomingFields.indexOf( fieldsToUse.get( i ) ) ) );
         } else {
-          //Set the value to the first parameter in the resolvingValuesMap.
-          resolvingValuesMap.put( (String) resolvingValuesMap.keySet().toArray()[i], staticInputs.get( i ) );
+          if ( i < staticInputs.size() && !Utils.isEmpty( Const.trim( staticInputs.get( i ) ) ) ) {
+            // if we do not have a field to use then check for static input values - if not empty - put that value
+            resolvingValuesMap.put( currentVariableToUpdate, staticInputs.get( i ) );
+          } else {
+            if ( !Utils.isEmpty( Const.trim( fieldsToUse.get( i ) ) ) ) {
+              // if both -field to use- and -static values- are empty, then check if it is in fact an empty field cell
+              // if not an empty cell then it is a declared variable that was resolved as null by previous steps
+              // put "" value ( not null) and also set transExecutor variable - to force create this variable
+              resolvingValuesMap.put( currentVariableToUpdate, "" );
+              this.setVariable( parameters.getVariable()[i], resolvingValuesMap.get( parameters.getVariable()[i] ) );
+            } else {
+              if ( !Utils.isEmpty( Const.trim( this.getVariable( parameters.getVariable()[i] ) ) ) && meta.getParameters().isInheritingAllVariables() ) {
+                // if everything is empty, then check for last option - parent variables if isInheriting is checked - if exists - put that value
+                resolvingValuesMap.put( currentVariableToUpdate, this.getVariable( parameters.getVariable()[i] ) );
+              } else {
+                // last case - if no variables defined - put "" value ( not null)
+                // and also set transExecutor variable - to force create this variable
+                resolvingValuesMap.put( currentVariableToUpdate, "" );
+                this.setVariable( parameters.getVariable()[i], resolvingValuesMap.get( parameters.getVariable()[i] ) );
+              }
+            }
+          }
         }
       } catch ( Exception e ) {
         //Set the value to the first parameter in the resolvingValuesMap.
-        resolvingValuesMap.put( (String) resolvingValuesMap.keySet().toArray()[i], null );
+        resolvingValuesMap.put( (String) resolvingValuesMap.keySet().toArray()[i], "" );
+        this.setVariable( parameters.getVariable()[i], resolvingValuesMap.get( parameters.getVariable()[i] ) );
       }
     }
     /////////////////////////////////////////////
@@ -342,8 +370,10 @@ public class TransExecutor extends BaseStep implements StepInterface {
     }
 
     Trans trans = getExecutorTrans();
+    initializeVariablesFromParent( trans );
+
     StepWithMappingMeta
-        .activateParams( trans, trans, this, trans.listParameters(), parameters.getVariable(), inputFieldValues );
+        .activateParams( trans, trans, this, trans.listParameters(), parameters.getVariable(), inputFieldValues, meta.getParameters().isInheritingAllVariables() );
   }
 
   @VisibleForTesting
@@ -517,4 +547,29 @@ public class TransExecutor extends BaseStep implements StepInterface {
   private void setData( TransExecutorData data ) {
     this.data = data;
   }
+
+  protected List<String> getLastIncomingFieldValues( ) {
+    TransExecutorData transExecutorData = getData();
+    List<String> lastIncomingFieldValues = new ArrayList<>();
+    if ( transExecutorData == null || transExecutorData.groupBuffer.isEmpty() ) {
+      return null;
+    }
+
+    int lastIncomingFieldIndex = transExecutorData.groupBuffer.size() - 1;
+    ArrayList lastGroupBufferData = new ArrayList( Arrays.asList( transExecutorData.groupBuffer.get( lastIncomingFieldIndex ).getData() ) );
+    lastGroupBufferData.removeAll( Collections.singleton( null ) );
+
+    for ( int i = 0; i < lastGroupBufferData.size(); i++ ) {
+      lastIncomingFieldValues.add( lastGroupBufferData.get( i ).toString() );
+    }
+    return lastIncomingFieldValues;
+  }
+
+  void initializeVariablesFromParent( Trans trans ) {
+    if ( meta.getParameters().isInheritingAllVariables() ) {
+      trans.initializeVariablesFrom( getTrans() );
+    }
+  }
+
+
 }

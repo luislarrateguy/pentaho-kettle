@@ -2,7 +2,7 @@
  *
  * Pentaho Data Integration
  *
- * Copyright (C) 2002-2018 by Hitachi Vantara : http://www.pentaho.com
+ * Copyright (C) 2018-2019 by Hitachi Vantara : http://www.pentaho.com
  *
  *******************************************************************************
  *
@@ -22,6 +22,7 @@
 
 package org.pentaho.di.trans.step.jms;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.lang.BooleanUtils;
 import org.pentaho.di.core.CheckResultInterface;
 import org.pentaho.di.core.exception.KettleException;
@@ -36,17 +37,24 @@ import org.pentaho.di.trans.step.StepMeta;
 import org.pentaho.di.trans.step.StepMetaInterface;
 
 import javax.jms.Destination;
+import javax.jms.JMSContext;
 import javax.jms.JMSProducer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+import static java.util.Optional.ofNullable;
 
 public class JmsProducer extends BaseStep implements StepInterface {
 
-  private JmsProducerMeta meta;
-  private JMSProducer producer;
+  JmsProducerMeta meta;
+  @VisibleForTesting
+  JMSProducer producer;
   private Destination destination;
   private int messageIndex;
+  private JMSContext jmsContext;
+  private AtomicBoolean closed = new AtomicBoolean( false );
 
   public JmsProducer( StepMeta stepMeta,
                       StepDataInterface stepDataInterface, int copyNr,
@@ -64,6 +72,7 @@ public class JmsProducer extends BaseStep implements StepInterface {
       remarks, getTransMeta(), meta.getParentStepMeta(),
       null, null, null, null, //these parameters are not used inside the method
       variables, getRepository(), getMetaStore() );
+    @SuppressWarnings( "squid:S3864" ) //usage of peek is appropriate here
     boolean errorsPresent =
       remarks.stream().filter( result -> result.getType() == CheckResultInterface.TYPE_RESULT_ERROR )
         .peek( result -> logError( result.getText() ) )
@@ -80,6 +89,7 @@ public class JmsProducer extends BaseStep implements StepInterface {
     Object[] row = getRow();
 
     if ( null == row ) {
+      jmsContext.close();
       setOutputDone();
       return false;  // indicates done
     }
@@ -88,7 +98,8 @@ public class JmsProducer extends BaseStep implements StepInterface {
       // init connections
       log.logDebug( "Connection Details: "
         + meta.jmsDelegate.getJmsProvider().getConnectionDetails( meta.jmsDelegate ) );
-      producer = meta.jmsDelegate.getJmsContext().createProducer();
+      jmsContext = meta.jmsDelegate.getJmsContext();
+      producer = jmsContext.createProducer();
       destination = meta.jmsDelegate.getDestination();
       messageIndex = getInputRowMeta().indexOfValue( meta.getFieldToSend() );
 
@@ -103,13 +114,24 @@ public class JmsProducer extends BaseStep implements StepInterface {
 
       first = false;
     }
+    if ( closed.get() ) {
+      return false;
+    }
 
     // send row to JMS
-    producer.send( destination, row[ messageIndex ].toString() );
+    producer.send( destination, ofNullable( row[ messageIndex ] )
+      .map( Object::toString )
+      .orElse( null ) );
 
     // send to next steps
     putRow( getInputRowMeta(), row );
     return true;
+  }
+
+  @Override public void stopRunning( StepMetaInterface stepMetaInterface, StepDataInterface stepDataInterface ) {
+    if ( jmsContext != null && !closed.getAndSet( true ) ) {
+      jmsContext.close();
+    }
   }
 
   private void setOptions( JMSProducer producer ) {

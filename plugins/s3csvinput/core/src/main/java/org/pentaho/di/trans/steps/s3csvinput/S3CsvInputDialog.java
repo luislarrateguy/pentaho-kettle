@@ -2,7 +2,7 @@
  *
  * Pentaho Data Integration
  *
- * Copyright (C) 2002-2018 by Hitachi Vantara : http://www.pentaho.com
+ * Copyright (C) 2002-2019 by Hitachi Vantara : http://www.pentaho.com
  *
  *******************************************************************************
  *
@@ -49,6 +49,8 @@ import org.eclipse.swt.widgets.Shell;
 import org.eclipse.swt.widgets.TableItem;
 import org.eclipse.swt.widgets.Text;
 import org.pentaho.di.core.Const;
+import org.pentaho.di.core.row.value.ValueMetaBase;
+import org.pentaho.di.core.util.EnvUtil;
 import org.pentaho.di.core.util.Utils;
 import org.pentaho.di.core.exception.KettleStepException;
 import org.pentaho.di.core.row.RowMeta;
@@ -535,6 +537,7 @@ public class S3CsvInputDialog extends BaseStepDialog implements StepDialogInterf
         //
         try {
           S3CsvInputMeta meta = new S3CsvInputMeta();
+          setAwsCredentials( meta );
           getInfo( meta );
           S3ObjectsProvider s3ObjProvider = new S3ObjectsProvider( meta.getS3Client( transMeta ) );
 
@@ -562,8 +565,8 @@ public class S3CsvInputDialog extends BaseStepDialog implements StepDialogInterf
         public void widgetSelected( SelectionEvent event ) {
           try {
             S3CsvInputMeta meta = new S3CsvInputMeta();
+            setAwsCredentials( meta );
             getInfo( meta );
-
             S3ObjectsProvider s3ObjProvider = new S3ObjectsProvider( meta.getS3Client( transMeta ) );
             String[] objectnames = s3ObjProvider.getS3ObjectsNames( meta.getBucket() );
 
@@ -577,6 +580,7 @@ public class S3CsvInputDialog extends BaseStepDialog implements StepDialogInterf
                 dialog.setSelectedNrs( new int[] { index, } );
               }
             }
+
             String objectname = dialog.open();
             if ( objectname != null ) {
               wFilename.setText( objectname );
@@ -589,8 +593,6 @@ public class S3CsvInputDialog extends BaseStepDialog implements StepDialogInterf
         }
       } );
     }
-
-
     // Detect X or ALT-F4 or something that kills this window...
     shell.addShellListener( new ShellAdapter() {
       @Override
@@ -613,6 +615,16 @@ public class S3CsvInputDialog extends BaseStepDialog implements StepDialogInterf
       }
     }
     return stepname;
+  }
+
+  private void setAwsCredentials( S3CsvInputMeta meta ) {
+    /* For legacy transformations containing AWS S3 access credentials, {@link Const#KETTLE_USE_AWS_DEFAULT_CREDENTIALS} can force Spoon to use
+     * the Amazon Default Credentials Provider Chain instead of using the credentials embedded in the transformation metadata. */
+    if ( !ValueMetaBase.convertStringToBoolean(
+      Const.NVL( EnvUtil.getSystemProperty( Const.KETTLE_USE_AWS_DEFAULT_CREDENTIALS ), "N" ) ) ) {
+      meta.setAwsAccessKey( transMeta.environmentSubstitute( Const.NVL( inputMeta.getAwsAccessKey(), "" ) ) );
+      meta.setAwsSecretKey( transMeta.environmentSubstitute( Const.NVL( inputMeta.getAwsSecretKey(), "" ) ) );
+    }
   }
 
   public void getData() {
@@ -668,7 +680,6 @@ public class S3CsvInputDialog extends BaseStepDialog implements StepDialogInterf
   }
 
   private void getInfo( S3CsvInputMeta inputMeta ) {
-
     inputMeta.setBucket( wBucket.getText() );
 
     if ( isReceivingInput ) {

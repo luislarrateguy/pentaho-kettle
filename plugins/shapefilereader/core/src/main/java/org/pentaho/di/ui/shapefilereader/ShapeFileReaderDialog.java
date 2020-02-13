@@ -2,7 +2,7 @@
  *
  * Pentaho Data Integration
  *
- * Copyright (C) 2002-2017 by Hitachi Vantara : http://www.pentaho.com
+ * Copyright (C) 2002-2019 by Hitachi Vantara : http://www.pentaho.com
  *
  *******************************************************************************
  *
@@ -26,13 +26,17 @@
  */
 package org.pentaho.di.ui.shapefilereader;
 
+import org.apache.commons.lang.StringUtils;
 import org.eclipse.swt.SWT;
+import org.eclipse.swt.custom.CCombo;
+import org.eclipse.swt.events.FocusListener;
 import org.eclipse.swt.events.ModifyEvent;
 import org.eclipse.swt.events.ModifyListener;
 import org.eclipse.swt.events.SelectionAdapter;
 import org.eclipse.swt.events.SelectionEvent;
 import org.eclipse.swt.events.ShellAdapter;
 import org.eclipse.swt.events.ShellEvent;
+import org.eclipse.swt.graphics.Cursor;
 import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.layout.FormAttachment;
 import org.eclipse.swt.layout.FormData;
@@ -56,7 +60,10 @@ import org.pentaho.di.ui.core.dialog.EnterSelectionDialog;
 import org.pentaho.di.ui.trans.step.BaseStepDialog;
 import org.pentaho.di.ui.util.SwtSvgImageUtil;
 
+import java.nio.charset.Charset;
+import java.util.ArrayList;
 import java.util.Enumeration;
+import java.util.List;
 import java.util.Properties;
 
 public class ShapeFileReaderDialog extends BaseStepDialog implements StepDialogInterface {
@@ -74,6 +81,10 @@ public class ShapeFileReaderDialog extends BaseStepDialog implements StepDialogI
   private Text wDbf;
   private FormData fdlDbf, fdbDbf, fdbcDbf, fdDbf;
 
+  private Label wlEncoding;
+  private CCombo wEncoding;
+  private FormData fdlEncoding, fdEncoding;
+
   private ShapeFileReaderMeta input;
   private boolean backup_changed;
 
@@ -85,10 +96,15 @@ public class ShapeFileReaderDialog extends BaseStepDialog implements StepDialogI
   public String open() {
     Shell parent = getParent();
     Display display = parent.getDisplay();
+    //set encoding based on environment variable or empty otherwise
+    if ( StringUtils.isBlank( input.getEncoding() ) ) {
+      input.setEncoding( StringUtils.isNotBlank( transMeta.getVariable( "ESRI.encoding" ) )
+        ? transMeta.getVariable( "ESRI.encoding" ) : "" );
+    }
 
     shell = new Shell( parent, SWT.DIALOG_TRIM | SWT.RESIZE | SWT.MAX | SWT.MIN );
     props.setLook( shell );
-    shell.setImage( getImage() );
+    setShellImage( shell, input );
 
     ModifyListener lsMod = new ModifyListener() {
       public void modifyText( ModifyEvent e ) {
@@ -195,6 +211,39 @@ public class ShapeFileReaderDialog extends BaseStepDialog implements StepDialogI
     fdDbf.right = new FormAttachment( wbcDbf, -margin );
     fdDbf.top = new FormAttachment( wShape, margin );
     wDbf.setLayoutData( fdDbf );
+
+    //Encoding
+    wlEncoding = new Label( shell, SWT.RIGHT );
+    wlEncoding.setText( BaseMessages.getString( PKG, "ShapeFileReader.Encoding.Label" ) );
+    props.setLook( wlEncoding );
+    fdlEncoding = new FormData();
+    fdlEncoding.left = new FormAttachment( 0, 0 );
+    fdlEncoding.top = new FormAttachment( wDbf, margin );
+    fdlEncoding.right = new FormAttachment( middle, -margin );
+    wlEncoding.setLayoutData( fdlEncoding );
+    wEncoding = new CCombo( shell, SWT.BORDER | SWT.READ_ONLY );
+    wEncoding.setEditable( false );
+    props.setLook( wEncoding );
+    wEncoding.addModifyListener( lsMod );
+    fdEncoding = new FormData();
+    fdEncoding.left = new FormAttachment( middle, 0 );
+    fdEncoding.top = new FormAttachment( wDbf, margin );
+    fdEncoding.right = new FormAttachment( 100, 0 );
+    wEncoding.setLayoutData( fdEncoding );
+    wEncoding.addFocusListener( new FocusListener() {
+      public void focusLost( org.eclipse.swt.events.FocusEvent e ) {
+      }
+
+      public void focusGained( org.eclipse.swt.events.FocusEvent e ) {
+        if ( wEncoding.getItemCount() == 0 ) {
+          Cursor busy = new Cursor( shell.getDisplay(), SWT.CURSOR_WAIT );
+          shell.setCursor( busy );
+          setEncodings();
+          shell.setCursor( null );
+          busy.dispose();
+        }
+      }
+    } );
 
     // Some buttons
     wOK = new Button( shell, SWT.PUSH );
@@ -365,8 +414,23 @@ public class ShapeFileReaderDialog extends BaseStepDialog implements StepDialogI
     if ( input.getDbfFilename() != null ) {
       wDbf.setText( input.getDbfFilename() );
     }
+    if ( StringUtils.isNotBlank( input.getEncoding() ) ) {
+      wEncoding.setText( input.getEncoding() );
+    }
 
     wStepname.selectAll();
+  }
+
+  private void setEncodings() {
+    List<Charset> values = new ArrayList<>( Charset.availableCharsets().values() );
+    for ( Charset charSet : values ) {
+      wEncoding.add( charSet.displayName() );
+    }
+
+    int idx = Const.indexOfString( input.getEncoding(), wEncoding.getItems() );
+    if ( idx >= 0 ) {
+      wEncoding.select( idx );
+    }
   }
 
   private void cancel() {
@@ -380,6 +444,8 @@ public class ShapeFileReaderDialog extends BaseStepDialog implements StepDialogI
 
     input.setShapeFilename( wShape.getText() );
     input.setDbfFilename( wDbf.getText() );
+    input.setEncoding( StringUtils.isNotBlank( wEncoding.getText() )
+      ? wEncoding.getText() : input.getEncoding() );
 
     dispose();
   }

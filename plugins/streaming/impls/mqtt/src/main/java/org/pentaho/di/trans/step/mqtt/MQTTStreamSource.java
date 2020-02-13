@@ -2,7 +2,7 @@
  *
  * Pentaho Data Integration
  *
- * Copyright (C) 2002-2018 by Hitachi Vantara : http://www.pentaho.com
+ * Copyright (C) 2002-2019 by Hitachi Vantara : http://www.pentaho.com
  *
  *******************************************************************************
  *
@@ -23,7 +23,6 @@
 package org.pentaho.di.trans.step.mqtt;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Charsets;
 import com.google.common.collect.ImmutableList;
 import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
 import org.eclipse.paho.client.mqttv3.MqttCallback;
@@ -41,20 +40,18 @@ import static java.util.Collections.singletonList;
  * broker, and qos. The parent class .rows() method is responsible for creating the blocking iterable.
  */
 public class MQTTStreamSource extends BlockingQueueStreamSource<List<Object>> {
-  private static final Class<?> PKG = MQTTStreamSource.class;
   private final MQTTConsumerMeta mqttConsumerMeta;
   private final MQTTConsumer mqttConsumer;
 
-  @VisibleForTesting protected MqttClient mqttClient;
+  @VisibleForTesting MqttClient mqttClient;
 
   private MqttCallback callback = new MqttCallback() {
     @Override public void connectionLost( Throwable cause ) {
       error( cause );
     }
 
-    @Override public void messageArrived( String topic, MqttMessage message ) throws Exception {
-      acceptRows( singletonList(
-        ImmutableList.of( new String( message.getPayload(), Charsets.UTF_8 ), topic ) ) );
+    @Override public void messageArrived( String topic, MqttMessage message ) {
+      acceptRows( singletonList( ImmutableList.of( readBytes( message.getPayload() ), topic ) ) );
     }
 
     @Override public void deliveryComplete( IMqttDeliveryToken token ) {

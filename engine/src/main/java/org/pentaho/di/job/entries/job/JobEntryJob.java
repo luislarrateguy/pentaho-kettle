@@ -2,7 +2,7 @@
  *
  * Pentaho Data Integration
  *
- * Copyright (C) 2002-2018 by Hitachi Vantara : http://www.pentaho.com
+ * Copyright (C) 2002-2019 by Hitachi Vantara : http://www.pentaho.com
  *
  *******************************************************************************
  *
@@ -83,6 +83,7 @@ import org.w3c.dom.Node;
 import java.io.OutputStream;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.List;
 import java.util.Map;
@@ -98,6 +99,7 @@ import java.util.UUID;
  */
 public class JobEntryJob extends JobEntryBase implements Cloneable, JobEntryInterface, HasRepositoryDirectories, JobEntryRunConfigurableInterface {
   private static Class<?> PKG = JobEntryJob.class; // for i18n purposes, needed by Translator2!!
+  public static final int IS_PENTAHO = 1;
 
   private String filename;
   private String jobname;
@@ -351,6 +353,24 @@ public class JobEntryJob extends JobEntryBase implements Cloneable, JobEntryInte
     return retval.toString();
   }
 
+  private void checkObjectLocationSpecificationMethod() {
+    if ( specificationMethod == null ) {
+      // Backward compatibility
+      //
+      // Default = Filename
+      //
+      specificationMethod = ObjectLocationSpecificationMethod.FILENAME;
+
+      if ( !Utils.isEmpty( filename ) ) {
+        specificationMethod = ObjectLocationSpecificationMethod.FILENAME;
+      } else if ( jobObjectId != null ) {
+        specificationMethod = ObjectLocationSpecificationMethod.REPOSITORY_BY_REFERENCE;
+      } else if ( !Utils.isEmpty( jobname ) ) {
+        specificationMethod = ObjectLocationSpecificationMethod.REPOSITORY_BY_NAME;
+      }
+    }
+  }
+
   @Override
   public void loadXML( Node entrynode, List<DatabaseMeta> databases, List<SlaveServer> slaveServers,
     Repository rep, IMetaStore metaStore ) throws KettleXMLException {
@@ -388,7 +408,17 @@ public class JobEntryJob extends JobEntryBase implements Cloneable, JobEntryInte
         }
       } else {
         specificationMethod = ObjectLocationSpecificationMethod.FILENAME;
+        if ( Utils.isEmpty( filename ) && !Utils.isEmpty( directory ) && !Utils.isEmpty( jobname ) ) {
+          // this job was exported from a repository and is being loaded locally
+          // need to create a well formatted filename
+          filename = directory + "/" + jobname;
+          if ( !filename.toLowerCase().endsWith( ".kjb" ) ) {
+            filename = filename + ".kjb";
+          }
+        }
       }
+
+      checkObjectLocationSpecificationMethod( );
 
       argFromPrevious = "Y".equalsIgnoreCase( XMLHandler.getTagValue( entrynode, "arg_from_previous" ) );
       paramsFromPrevious = "Y".equalsIgnoreCase( XMLHandler.getTagValue( entrynode, "params_from_previous" ) );
@@ -857,13 +887,26 @@ public class JobEntryJob extends JobEntryBase implements Cloneable, JobEntryInte
         SlaveServer remoteSlaveServer = null;
         JobExecutionConfiguration executionConfiguration = new JobExecutionConfiguration();
         if ( !Utils.isEmpty( runConfiguration ) ) {
-          log.logBasic( BaseMessages.getString( PKG, "JobJob.RunConfig.Message" ), runConfiguration );
           runConfiguration = environmentSubstitute( runConfiguration );
+          log.logBasic( BaseMessages.getString( PKG, "JobJob.RunConfig.Message" ), runConfiguration );
           executionConfiguration.setRunConfiguration( runConfiguration );
           try {
             ExtensionPointHandler.callExtensionPoint( log, KettleExtensionPoint.SpoonTransBeforeStart.id, new Object[] {
               executionConfiguration, parentJob.getJobMeta(), jobMeta, rep
             } );
+            List<Object> items = Arrays.asList( runConfiguration, false );
+            try {
+              ExtensionPointHandler.callExtensionPoint( log, KettleExtensionPoint
+                      .RunConfigurationSelection.id, items );
+              if ( waitingToFinish && (Boolean) items.get( IS_PENTAHO ) ) {
+                String jobName = parentJob.getJobMeta().getName();
+                String name = jobMeta.getName();
+                logBasic( BaseMessages.getString( PKG, "JobJob.Log.InvalidRunConfigurationCombination", jobName,
+                        name, jobName ) );
+              }
+            } catch ( Exception ignored ) {
+              // Ignored
+            }
             if ( !executionConfiguration.isExecutingLocally() && !executionConfiguration.isExecutingRemotely() ) {
               result.setResult( true );
               return result;
@@ -1331,7 +1374,7 @@ public class JobEntryJob extends JobEntryBase implements Cloneable, JobEntryInte
     }
   }
 
-  private JobMeta getJobMetaFromRepository( Repository rep, CurrentDirectoryResolver r, String transPath ) throws KettleException {
+  protected JobMeta getJobMetaFromRepository( Repository rep, CurrentDirectoryResolver r, String transPath, VariableSpace tmpSpace ) throws KettleException {
     String realJobName = "";
     String realDirectory = "/";
 
@@ -1346,7 +1389,11 @@ public class JobEntryJob extends JobEntryBase implements Cloneable, JobEntryInte
     if ( repositoryDirectory == null ) {
       throw new KettleException( "Unable to find repository directory [" + Const.NVL( realDirectory, "" ) + "]" );
     }
-    return rep.loadJob( realJobName, repositoryDirectory, null, null ); // reads
+    JobMeta jobMeta = rep.loadJob( realJobName, repositoryDirectory, null, null ); //reads
+    if ( jobMeta != null ) {
+      jobMeta.initializeVariablesFrom( tmpSpace );
+    }
+    return jobMeta;
   }
 
   public JobMeta getJobMeta( Repository rep, IMetaStore metaStore, VariableSpace space ) throws KettleException {
@@ -1363,7 +1410,7 @@ public class JobEntryJob extends JobEntryBase implements Cloneable, JobEntryInte
             jobMeta = new JobMeta( tmpSpace, realFilename, rep, metaStore, null );
           } catch ( KettleException e ) {
             // try to load from repository, this job may have been developed locally and later uploaded to the repository
-            jobMeta = getJobMetaFromRepository( rep, r, realFilename );
+            jobMeta = getJobMetaFromRepository( rep, r, realFilename, tmpSpace );
           }
           break;
         case REPOSITORY_BY_NAME:
@@ -1378,7 +1425,7 @@ public class JobEntryJob extends JobEntryBase implements Cloneable, JobEntryInte
             }
             jobMeta = new JobMeta( tmpSpace, transPath, rep, metaStore, null );
           } else {
-            jobMeta = getJobMetaFromRepository( rep, r, transPath );
+            jobMeta = getJobMetaFromRepository( rep, r, transPath, tmpSpace );
           }
           break;
         case REPOSITORY_BY_REFERENCE:

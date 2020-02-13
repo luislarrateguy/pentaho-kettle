@@ -2,7 +2,7 @@
  *
  * Pentaho Data Integration
  *
- * Copyright (C) 2018 by Hitachi Vantara : http://www.pentaho.com
+ * Copyright (C) 2018-2019 by Hitachi Vantara : http://www.pentaho.com
  *
  *******************************************************************************
  *
@@ -30,6 +30,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.pentaho.di.core.KettleEnvironment;
+import org.pentaho.di.core.annotations.Step;
 import org.pentaho.di.core.logging.KettleLogStore;
 import org.pentaho.di.core.logging.LogChannelInterface;
 import org.pentaho.di.core.logging.LogChannelInterfaceFactory;
@@ -43,6 +44,7 @@ import org.powermock.modules.junit4.PowerMockRunner;
 
 import java.util.Collections;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.Assert.assertEquals;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.eq;
@@ -69,7 +71,7 @@ public class MQTTProducerTest {
 
     StepPluginType.getInstance().handlePluginAnnotation(
       MQTTProducerMeta.class,
-      MQTTProducerMeta.class.getAnnotation( org.pentaho.di.core.annotations.Step.class ),
+      MQTTProducerMeta.class.getAnnotation( Step.class ),
       Collections.emptyList(), false, null );
     KettleEnvironment.init();
   }
@@ -93,14 +95,14 @@ public class MQTTProducerTest {
   @Test
   public void testSendRowToProducer() throws Exception {
     when( mqttClient.isConnected() ).thenReturn( true );
-    handleAsSecondRow();
+    handleAsSecondRow( trans );
     doAnswer( invocation -> {
       String topic = (String) invocation.getArguments()[ 0 ];
       MqttMessage message = (MqttMessage) invocation.getArguments()[ 1 ];
 
       assertEquals( "TestWinning", topic );
       assertEquals( 0, message.getQos() );
-      assertEquals( "#winning", new String( message.getPayload() ) );
+      assertEquals( "#winning", new String( message.getPayload(), UTF_8 ) );
       return null;
     } ).when( mqttClient ).publish( any(), any() );
 
@@ -109,6 +111,30 @@ public class MQTTProducerTest {
 
     verify( mqttClient ).disconnect();
     assertEquals( 4, trans.getSteps().get( 1 ).step.getLinesOutput() );
+  }
+
+  @Test
+  public void testSendBinaryToProducer() throws Exception {
+    TransMeta transMeta = new TransMeta( getClass().getResource( "/ProduceFourBinaryRows.ktr" ).getPath() );
+    Trans binaryTrans = new Trans( transMeta );
+    binaryTrans.prepareExecution( new String[] {} );
+    when( mqttClient.isConnected() ).thenReturn( true );
+    handleAsSecondRow( binaryTrans );
+    doAnswer( invocation -> {
+      String topic = (String) invocation.getArguments()[ 0 ];
+      MqttMessage message = (MqttMessage) invocation.getArguments()[ 1 ];
+
+      assertEquals( "TestLosing", topic );
+      assertEquals( 0, message.getQos() );
+      assertEquals( "#losing", new String( message.getPayload(), UTF_8 ) );
+      return null;
+    } ).when( mqttClient ).publish( any(), any() );
+
+    binaryTrans.startThreads();
+    binaryTrans.waitUntilFinished();
+
+    verify( mqttClient ).disconnect();
+    assertEquals( 4, binaryTrans.getSteps().get( 1 ).step.getLinesOutput() );
   }
 
   @Test
@@ -150,7 +176,7 @@ public class MQTTProducerTest {
 
   @Test
   public void testFeedbackSize() throws Exception {
-    handleAsSecondRow();
+    handleAsSecondRow( trans );
 
     StepMetaDataCombi combi = trans.getSteps().get( 1 );
     MQTTProducer step = (MQTTProducer) combi.step;
@@ -176,12 +202,12 @@ public class MQTTProducerTest {
     trans.startThreads();
     trans.waitUntilFinished();
 
-    verify( logChannel ).logError( eq("There was an error connecting"), any( RuntimeException.class ) );
+    verify( logChannel ).logError( eq( "There was an error connecting" ), any( RuntimeException.class ) );
   }
 
   @Test
   public void testErrorOnPublishStopsAll() throws Exception {
-    handleAsSecondRow();
+    handleAsSecondRow( trans );
 
     MqttException mqttException = mock( MqttException.class );
     when( mqttException.getMessage() ).thenReturn( "publish failed" );
@@ -199,7 +225,7 @@ public class MQTTProducerTest {
     assertEquals( 0, trans.getSteps().get( 1 ).step.getLinesOutput() );
   }
 
-  private void handleAsSecondRow() {
+  private void handleAsSecondRow( Trans trans ) {
     StepMetaDataCombi combi = trans.getSteps().get( 1 );
     MQTTProducer step = (MQTTProducer) combi.step;
     step.client = () -> mqttClient;

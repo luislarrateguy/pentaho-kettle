@@ -6,7 +6,7 @@
 
   <groupId>pentaho-kettle</groupId>
   <artifactId>kettle-engine</artifactId>
-  <version>8.2.0.0-SNAPSHOT</version>
+  <version>9.0.0.0-SNAPSHOT</version>
   <packaging>jar</packaging>
 
   <name>PDI Engine</name>
@@ -14,7 +14,7 @@
   <parent>
     <groupId>org.pentaho.di</groupId>
     <artifactId>pdi</artifactId>
-    <version>8.2.0.0-SNAPSHOT</version>
+    <version>9.0.0.0-SNAPSHOT</version>
   </parent>
 
   <properties>
@@ -23,10 +23,10 @@
     <maven-failsafe-plugin.reuseForks>false</maven-failsafe-plugin.reuseForks>
 
     <!-- Pentaho dependencies -->
-    <pentaho-reporting.version>8.2.0.0-SNAPSHOT</pentaho-reporting.version>
-    <pentaho-registry.version>8.2.0.0-SNAPSHOT</pentaho-registry.version>
-    <pentaho-connections.version>8.2.0.0-SNAPSHOT</pentaho-connections.version>
-    <mondrian.version>8.2.0.0-SNAPSHOT</mondrian.version>
+    <pentaho-reporting.version>9.0.0.0-SNAPSHOT</pentaho-reporting.version>
+    <pentaho-registry.version>9.0.0.0-SNAPSHOT</pentaho-registry.version>
+    <pentaho-connections.version>9.0.0.0-SNAPSHOT</pentaho-connections.version>
+    <mondrian.version>9.0.0.0-SNAPSHOT</mondrian.version>
 
     <!-- Third-party dependencies -->
     <antlr-complete.version>3.5.2</antlr-complete.version>
@@ -55,7 +55,6 @@
     <poi.version>3.17</poi.version>
     <commons-collections4.version>4.1</commons-collections4.version>
     <xmlbeans.version>2.6.0</xmlbeans.version>
-    <postgresql.version>42.1.1</postgresql.version>
     <rome.version>1.0</rome.version>
     <SassyReader.version>0.5</SassyReader.version>
     <saxon.version>9.1.0.8</saxon.version>
@@ -77,23 +76,29 @@
     <cglib-nodep.version>2.2</cglib-nodep.version>
     <nekohtml.version>1.9.15</nekohtml.version>
     <js.version>1.7R3</js.version>
-    <mail.version>1.4.7</mail.version>
+    <mail.version>1.6.1</mail.version>
     <mstor.version>0.9.13</mstor.version>
     <snappy-java.version>1.1.0</snappy-java.version>
     <commons-cli.version>1.2</commons-cli.version>
-    <jetty-plus.version>8.1.15.v20140411</jetty-plus.version>
-    <jetty-server.version>8.1.15.v20140411</jetty-server.version>
-    <jetty-security.version>8.1.15.v20140411</jetty-security.version>
-    <jetty-servlet.version>8.1.15.v20140411</jetty-servlet.version>
-    <jetty-xml.version>8.1.15.v20140411</jetty-xml.version>
-    <jetty-webapp.version>8.1.15.v20140411</jetty-webapp.version>
     <log4jdbc.version>1.2</log4jdbc.version>
-    <javax.servlet-api.version>3.0.1</javax.servlet-api.version>
+    <javax.servlet-api.version>3.1.0</javax.servlet-api.version>
     <oro.version>2.0.8</oro.version>
     <javax.websocket-api.version>1.1</javax.websocket-api.version>
-    <rxjava.version>2.0.4</rxjava.version>
+    <rxjava.version>2.2.3</rxjava.version>
     <xmlunit.version>1.5</xmlunit.version>
+    <wiremock.version>2.25.0</wiremock.version>
   </properties>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>javax.servlet</groupId>
+        <artifactId>javax.servlet-api</artifactId>
+        <version>${javax.servlet-api.version}</version>
+        <scope>provided</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
 
   <dependencies>
     <!-- Kettle dependencies -->
@@ -149,6 +154,10 @@
 
 
     <!-- Third-party dependencies -->
+    <dependency>
+      <groupId>org.dom4j</groupId>
+      <artifactId>dom4j</artifactId>
+    </dependency>
     <dependency>
       <groupId>commons-codec</groupId>
       <artifactId>commons-codec</artifactId>
@@ -484,7 +493,6 @@
     <dependency>
       <groupId>org.postgresql</groupId>
       <artifactId>postgresql</artifactId>
-      <version>${postgresql.version}</version>
       <exclusions>
         <exclusion>
           <groupId>*</groupId>
@@ -725,8 +733,8 @@
       </exclusions>
     </dependency>
     <dependency>
-      <groupId>javax.mail</groupId>
-      <artifactId>mail</artifactId>
+      <groupId>com.sun.mail</groupId>
+      <artifactId>javax.mail</artifactId>
       <version>${mail.version}</version>
     </dependency>
     <dependency>
@@ -758,8 +766,7 @@
     </dependency>
     <dependency>
       <groupId>org.eclipse.jetty</groupId>
-      <artifactId>jetty-plus</artifactId>
-      <version>${jetty-plus.version}</version>
+      <artifactId>jetty-jaas</artifactId>
       <exclusions>
         <exclusion>
           <groupId>*</groupId>
@@ -770,7 +777,6 @@
     <dependency>
       <groupId>org.eclipse.jetty</groupId>
       <artifactId>jetty-server</artifactId>
-      <version>${jetty-server.version}</version>
       <exclusions>
         <exclusion>
           <groupId>org.eclipse.jetty.orbit</groupId>
@@ -781,7 +787,6 @@
     <dependency>
       <groupId>org.eclipse.jetty</groupId>
       <artifactId>jetty-security</artifactId>
-      <version>${jetty-security.version}</version>
       <exclusions>
         <exclusion>
           <groupId>*</groupId>
@@ -792,7 +797,16 @@
     <dependency>
       <groupId>org.eclipse.jetty</groupId>
       <artifactId>jetty-servlet</artifactId>
-      <version>${jetty-servlet.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>*</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.eclipse.jetty</groupId>
+      <artifactId>jetty-util</artifactId>
       <exclusions>
         <exclusion>
           <groupId>*</groupId>
@@ -803,7 +817,6 @@
     <dependency>
       <groupId>org.eclipse.jetty</groupId>
       <artifactId>jetty-xml</artifactId>
-      <version>${jetty-xml.version}</version>
       <exclusions>
         <exclusion>
           <groupId>*</groupId>
@@ -814,7 +827,6 @@
     <dependency>
       <groupId>org.eclipse.jetty</groupId>
       <artifactId>jetty-webapp</artifactId>
-      <version>${jetty-webapp.version}</version>
       <exclusions>
         <exclusion>
           <groupId>*</groupId>
@@ -836,14 +848,6 @@
     <dependency>
       <groupId>javax.servlet</groupId>
       <artifactId>javax.servlet-api</artifactId>
-      <version>${javax.servlet-api.version}</version>
-      <scope>provided</scope>
-      <exclusions>
-        <exclusion>
-          <groupId>*</groupId>
-          <artifactId>*</artifactId>
-        </exclusion>
-      </exclusions>
     </dependency>
     <dependency>
       <groupId>javax.websocket</groupId>
@@ -861,6 +865,14 @@
       <groupId>org.codehaus.woodstox</groupId>
       <artifactId>wstx-asl</artifactId>
     </dependency>
+    <dependency>
+      <groupId>org.apache.httpcomponents</groupId>
+      <artifactId>httpclient</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.httpcomponents</groupId>
+      <artifactId>httpcore</artifactId>
+    </dependency>
 
     <!-- Test dependencies -->
     <dependency>
@@ -875,6 +887,7 @@
       <artifactId>h2</artifactId>
       <scope>test</scope>
     </dependency>
+    <!-- required by org.dom4j -->
     <dependency>
       <groupId>jaxen</groupId>
       <artifactId>jaxen</artifactId>
@@ -925,6 +938,12 @@
       <groupId>xmlunit</groupId>
       <artifactId>xmlunit</artifactId>
       <version>${xmlunit.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.github.tomakehurst</groupId>
+      <artifactId>wiremock-jre8-standalone</artifactId>
+      <version>${wiremock.version}</version>
       <scope>test</scope>
     </dependency>
   </dependencies>

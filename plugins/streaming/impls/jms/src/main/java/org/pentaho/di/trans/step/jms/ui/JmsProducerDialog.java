@@ -2,7 +2,7 @@
  *
  * Pentaho Data Integration
  *
- * Copyright (C) 2002-2018 by Hitachi Vantara : http://www.pentaho.com
+ * Copyright (C) 2002-2019 by Hitachi Vantara : http://www.pentaho.com
  *
  *******************************************************************************
  *
@@ -91,10 +91,6 @@ public class JmsProducerDialog extends BaseStepDialog implements StepDialogInter
   private final JmsDelegate jmsDelegate;
   private final JmsProducerMeta meta;
   private CTabFolder wTabFolder;
-  private CTabItem wSetupTab;
-  private CTabItem wPropertiesTab;
-  private Composite wSetupComp;
-  private Composite wPropertiesComp;
   private ConnectionForm connectionForm;
   private DestinationForm destinationForm;
   private ComboVar wMessageField;
@@ -207,10 +203,10 @@ public class JmsProducerDialog extends BaseStepDialog implements StepDialogInter
     wTabFolder.setLayoutData( fdTabFolder );
 
     //Setup Tab
-    wSetupTab = new CTabItem( wTabFolder, SWT.NONE );
+    CTabItem wSetupTab = new CTabItem( wTabFolder, SWT.NONE );
     wSetupTab.setText( BaseMessages.getString( PKG, "JmsProducerDialog.SetupTab" ) );
 
-    wSetupComp = new Composite( wTabFolder, SWT.NONE );
+    Composite wSetupComp = new Composite( wTabFolder, SWT.NONE );
     props.setLook( wSetupComp );
     FormLayout setupLayout = new FormLayout();
     setupLayout.marginHeight = 15;
@@ -223,9 +219,12 @@ public class JmsProducerDialog extends BaseStepDialog implements StepDialogInter
 
     connectionForm = new ConnectionForm( wSetupComp, props, transMeta, lsMod, jmsDelegate, jmsDialogSecurityLayout );
     Group group = connectionForm.layoutForm();
+
+    jmsDialogSecurityLayout.setConnectionForm( connectionForm );
+
     destinationForm = new DestinationForm(
       wSetupComp, group, props, transMeta, lsMod, jmsDelegate.destinationType, jmsDelegate.destinationName );
-    Composite destinationFormComposite =  destinationForm.layoutForm();
+    Composite destinationFormComposite = destinationForm.layoutForm();
 
     Label lbMessageField = new Label( wSetupComp, SWT.LEFT );
     props.setLook( lbMessageField );
@@ -297,9 +296,9 @@ public class JmsProducerDialog extends BaseStepDialog implements StepDialogInter
   }
 
   private void buildProperiesTab() {
-    wPropertiesTab = new CTabItem( wTabFolder, SWT.NONE );
+    CTabItem wPropertiesTab = new CTabItem( wTabFolder, SWT.NONE );
     wPropertiesTab.setText( BaseMessages.getString( PKG, "JmsProducerDialog.Properties.Tab" ) );
-    wPropertiesComp = new Composite( wTabFolder, SWT.NONE );
+    Composite wPropertiesComp = new Composite( wTabFolder, SWT.NONE );
     props.setLook( wPropertiesComp );
     FormLayout fieldsLayout = new FormLayout();
     fieldsLayout.marginHeight = 15;
@@ -368,11 +367,12 @@ public class JmsProducerDialog extends BaseStepDialog implements StepDialogInter
       ColumnInfo.COLUMN_TYPE_TEXT, false, false );
     propertyName.setUsingVariables( true );
 
-    ColumnInfo propertyValue = new ColumnInfo( BaseMessages.getString( PKG, "JmsProducerDialog.Properties.Column.Value" ),
-      ColumnInfo.COLUMN_TYPE_TEXT, false, false );
+    ColumnInfo propertyValue =
+      new ColumnInfo( BaseMessages.getString( PKG, "JmsProducerDialog.Properties.Column.Value" ),
+        ColumnInfo.COLUMN_TYPE_TEXT, false, false );
     propertyValue.setUsingVariables( true );
 
-    return new ColumnInfo[]{ propertyName, propertyValue };
+    return new ColumnInfo[] { propertyName, propertyValue };
   }
 
   public static Map<String, String> getMapFromTableView( TableView table ) {
@@ -504,7 +504,7 @@ public class JmsProducerDialog extends BaseStepDialog implements StepDialogInter
   private List<StepOption> saveOptions() {
     IntStream.range( 0, optionsTable.getItemCount() )
       .mapToObj( i -> optionsTable.getItem( i ) )
-      .forEach( item -> {
+      .forEach( item ->
         options.stream().forEach( option -> {
           if ( option.getText().equals( item[ 0 ] ) ) {
             switch ( option.getKey() ) {
@@ -532,18 +532,20 @@ public class JmsProducerDialog extends BaseStepDialog implements StepDialogInter
               case JMS_TYPE:
                 meta.setJmsType( item[ 1 ] );
                 break;
+              default:
+                log.logBasic( BaseMessages.getString( PKG, "JmsDialog.Options.OptionNotFound", option.getKey() ) );
             }
           }
-        } );
-      } );
+        } )
+      );
     return options;
   }
 
   @Override
   public void setSize() {
     setSize( shell );  // sets shell location and preferred size
-    shell.setMinimumSize( SHELL_MIN_WIDTH, SHELL_MIN_HEIGHT  );
-    shell.setSize(  SHELL_MIN_WIDTH, SHELL_MIN_HEIGHT   ); // force initial size
+    shell.setMinimumSize( SHELL_MIN_WIDTH, SHELL_MIN_HEIGHT );
+    shell.setSize( SHELL_MIN_WIDTH, SHELL_MIN_HEIGHT ); // force initial size
   }
 
   private void cancel() {

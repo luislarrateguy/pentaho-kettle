@@ -2,7 +2,7 @@
  *
  * Pentaho Data Integration
  *
- * Copyright (C) 2002-2018 by Hitachi Vantara : http://www.pentaho.com
+ * Copyright (C) 2002-2019 by Hitachi Vantara : http://www.pentaho.com
  *
  *******************************************************************************
  *
@@ -52,6 +52,7 @@ import org.pentaho.di.trans.step.StepMeta;
 import org.pentaho.di.trans.step.StepMetaInjectionInterface;
 import org.pentaho.di.trans.step.StepMetaInterface;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
@@ -146,6 +147,7 @@ public class MetaInject extends BaseStep implements StepInterface {
       // Now we can execute this modified transformation metadata.
       //
       final Trans injectTrans = createInjectTrans();
+      injectTrans.setParentTrans( getTrans() );
       injectTrans.setMetaStore( getMetaStore() );
       if ( getTrans().getParentJob() != null ) {
         injectTrans.setParentJob( getTrans().getParentJob() ); // See PDI-13224
@@ -259,9 +261,19 @@ public class MetaInject extends BaseStep implements StepInterface {
 
     OutputStream os = null;
     try {
+      TransMeta generatedTransMeta = (TransMeta) data.transMeta.clone();
+      File injectedKtrFile = new File( targetFilePath );
+
+      if ( injectedKtrFile == null ) {
+        throw new IOException();
+      } else {
+        String transName = injectedKtrFile.getName().replace( ".ktr", "" );
+        generatedTransMeta.setName( transName ); // set transname on injectedtrans to be same as filename w/o extension
+      }
+
       os = KettleVFS.getOutputStream( targetFilePath, false );
       os.write( XMLHandler.getXMLHeader().getBytes( Const.XML_ENCODING ) );
-      os.write( data.transMeta.getXML().getBytes( Const.XML_ENCODING ) );
+      os.write( generatedTransMeta.getXML().getBytes( Const.XML_ENCODING ) );
     } catch ( IOException e ) {
       throw new KettleException( "Unable to write target file (ktr after injection) to file '"
         + targetFilePath + "'", e );
@@ -394,11 +406,10 @@ public class MetaInject extends BaseStep implements StepInterface {
     BeanInjector injector = new BeanInjector( injectionInfo );
 
     // Collect all the metadata for this target step...
-    //
-    Map<TargetStepAttribute, SourceStepField> targetMap = meta.getTargetSourceMapping();
-    for ( TargetStepAttribute target : targetMap.keySet() ) {
-      SourceStepField source = targetMap.get( target );
-
+    boolean wasInjection = false;
+    for ( Map.Entry<TargetStepAttribute, SourceStepField> entry  : meta.getTargetSourceMapping().entrySet() ) {
+      TargetStepAttribute target = entry.getKey();
+      SourceStepField source = entry.getValue();
       if ( target.getStepname().equalsIgnoreCase( targetStep ) ) {
         // This is the step to collect data for...
         // We also know which step to read the data from. (source)
@@ -408,6 +419,7 @@ public class MetaInject extends BaseStep implements StepInterface {
           if ( injector.hasProperty( targetStepMeta, target.getAttributeKey() ) ) {
             // target step has specified key
             injector.setProperty( targetStepMeta, target.getAttributeKey(), null, source.getField() );
+            wasInjection = true;
           } else {
             // target step doesn't have specified key - just report but don't fail like in 6.0 (BACKLOG-6753)
             logError( BaseMessages.getString( PKG, "MetaInject.TargetKeyIsNotDefined.Message", target.getAttributeKey(),
@@ -415,6 +427,10 @@ public class MetaInject extends BaseStep implements StepInterface {
           }
         }
       }
+    }
+    // NOTE: case when only 1 field out of group is supplied constant, need to populate other fields
+    if ( wasInjection ) {
+      injector.runPostInjectionProcessing( targetStepMeta );
     }
   }
 

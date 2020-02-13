@@ -6,11 +6,11 @@
   <parent>
     <groupId>org.pentaho.di.plugins</groupId>
     <artifactId>s3csvinput</artifactId>
-    <version>8.2.0.0-SNAPSHOT</version>
+    <version>9.0.0.0-SNAPSHOT</version>
   </parent>
 
   <artifactId>kettle-s3csvinput-plugin-core</artifactId>
-  <version>8.2.0.0-SNAPSHOT</version>
+  <version>9.0.0.0-SNAPSHOT</version>
   <packaging>jar</packaging>
 
   <name>PDI S3 CSV Input Plugin Core</name>
@@ -40,7 +40,10 @@
     <dependency>
       <groupId>com.amazonaws</groupId>
       <artifactId>aws-java-sdk-core</artifactId>
-      <version>1.11.275</version>
+    </dependency>
+    <dependency>
+      <groupId>com.amazonaws</groupId>
+      <artifactId>aws-java-sdk-s3</artifactId>
     </dependency>
     <dependency>
       <groupId>pentaho-kettle</groupId>
@@ -51,11 +54,6 @@
       <groupId>pentaho-kettle</groupId>
       <artifactId>kettle-core</artifactId>
       <classifier>tests</classifier>
-    </dependency>
-    <dependency>
-      <groupId>com.amazonaws</groupId>
-      <artifactId>aws-java-sdk-s3</artifactId>
-      <version>1.11.275</version>
     </dependency>
     <dependency>
       <groupId>org.powermock</groupId>

@@ -2,7 +2,7 @@
  *
  * Pentaho Data Integration
  *
- * Copyright (C) 2018 by Hitachi Vantara : http://www.pentaho.com
+ * Copyright (C) 2018-2019 by Hitachi Vantara : http://www.pentaho.com
  *
  *******************************************************************************
  *
@@ -75,13 +75,13 @@ public interface CsvInputAwareStepDialog {
       return fieldNames;
     }
     final String delimiter = getTransMeta().environmentSubstitute( meta.getDelimiter() );
-    final String enclosure = getTransMeta().environmentSubstitute( meta.getEncoding() );
+    final String enclosure = getTransMeta().environmentSubstitute( meta.getEnclosure() );
 
     final EncodingType encodingType = EncodingType.guessEncodingType( reader.getEncoding() );
 
     // Read a line of data to determine the number of rows...
     final String line = TextFileInputUtils.getLine( getLogChannel(), reader, encodingType, meta.getFileFormatTypeNr(),
-      new StringBuilder( 1000 ) );
+      new StringBuilder( 1000 ), enclosure );
     if ( !StringUtils.isBlank( line ) ) {
       fieldNames = CsvInput.guessStringsFromLine( getLogChannel(), line, delimiter, enclosure,
         meta.getEscapeCharacter() );

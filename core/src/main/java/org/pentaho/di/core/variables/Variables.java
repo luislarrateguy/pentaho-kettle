@@ -2,7 +2,7 @@
  *
  * Pentaho Data Integration
  *
- * Copyright (C) 2002-2017 by Hitachi Vantara : http://www.pentaho.com
+ * Copyright (C) 2002-2019 by Hitachi Vantara : http://www.pentaho.com
  *
  *******************************************************************************
  *
@@ -211,8 +211,9 @@ public class Variables implements VariableSpace {
     if ( initialized ) {
       // variables are already initialized
       if ( prop != null ) {
-        for ( String key : prop.keySet() ) {
-          String value = prop.get( key );
+        for ( Map.Entry<String, String> entry : prop.entrySet() ) {
+          String value = entry.getValue();
+          String key = entry.getKey();
           if ( !Utils.isEmpty( key ) ) {
             properties.put( key, Const.NVL( value, "" ) );
           }
@@ -223,8 +224,9 @@ public class Variables implements VariableSpace {
       // We have our own personal copy, so changes afterwards
       // to the input properties don't affect us.
       injection = new Hashtable<String, String>();
-      for ( String key : prop.keySet() ) {
-        String value = prop.get( key );
+      for ( Map.Entry<String, String> entry : prop.entrySet() ) {
+        String value = entry.getValue();
+        String key = entry.getKey();
         if ( !Utils.isEmpty( key ) ) {
           injection.put( key, Const.NVL( value, "" ) );
         }
@@ -237,7 +239,7 @@ public class Variables implements VariableSpace {
    *
    * @return a default variable space.
    */
-  public static synchronized VariableSpace getADefaultVariableSpace() {
+  public static VariableSpace getADefaultVariableSpace() {
     VariableSpace space = new Variables();
 
     space.initializeVariablesFrom( null );

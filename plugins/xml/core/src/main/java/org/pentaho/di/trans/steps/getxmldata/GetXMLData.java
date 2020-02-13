@@ -2,7 +2,7 @@
  *
  * Pentaho Data Integration
  *
- * Copyright (C) 2002-2018 by Hitachi Vantara : http://www.pentaho.com
+ * Copyright (C) 2002-2019 by Hitachi Vantara : http://www.pentaho.com
  *
  *******************************************************************************
  *
@@ -113,7 +113,7 @@ public class GetXMLData extends BaseStep implements StepInterface {
         }
         if ( data.PathValue.equals( data.prunePath ) ) {
           // Edge case, but if true, there will only ever be one item in the list
-          data.an = new ArrayList<AbstractNode>( 1 ); // pre-allocate array and sizes
+          data.an = new ArrayList<>( 1 ); // pre-allocate array and sizes
           data.an.add( null );
         }
         reader.addHandler( data.prunePath, new ElementHandler() {
@@ -122,7 +122,8 @@ public class GetXMLData extends BaseStep implements StepInterface {
           }
 
           public void onEnd( ElementPath path ) {
-            if ( isStopped() ) {
+            long rowLimit = meta.getRowLimit();
+            if ( isStopped() || ( rowLimit > 0 && data.rownr > rowLimit ) ) {
               // when a large file is processed and it should be stopped it is still reading the hole thing
               // the only solution I see is to prune / detach the document and this will lead into a
               // NPE or other errors depending on the parsing location - this will be treated in the catch part below
@@ -396,7 +397,7 @@ public class GetXMLData extends BaseStep implements StepInterface {
           FileObject file = null;
           try {
             // XML source is a file.
-            file = KettleVFS.getFileObject( Fieldvalue, getTransMeta() );
+            file = KettleVFS.getFileObject( environmentSubstitute( Fieldvalue ), getTransMeta() );
 
             if ( meta.isIgnoreEmptyFile() && file.getContent().getSize() == 0 ) {
               logBasic( BaseMessages.getString( PKG, "GetXMLData.Error.FileSizeZero", "" + file.getName() ) );
@@ -720,7 +721,7 @@ public class GetXMLData extends BaseStep implements StepInterface {
     return r;
   }
 
-  private Object[] processPutRow( AbstractNode node ) throws KettleException {
+  private Object[] processPutRow( Node node ) throws KettleException {
     // Create new row...
     Object[] outputRowData = buildEmptyRow();
 

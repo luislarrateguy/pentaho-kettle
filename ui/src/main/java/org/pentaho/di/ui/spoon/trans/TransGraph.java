@@ -3,7 +3,7 @@
  *
  * Pentaho Data Integration
  *
- * Copyright (C) 2002-2018 by Hitachi Vantara : http://www.pentaho.com
+ * Copyright (C) 2002-2019 by Hitachi Vantara : http://www.pentaho.com
  *
  *******************************************************************************
  *
@@ -2061,12 +2061,6 @@ public class TransGraph extends AbstractGraph implements XulEventHandler, Redraw
   @Override
   public void keyReleased( KeyEvent e ) {
   }
-
-  @Override
-  public boolean setFocus() {
-    return ( canvas != null ) ? canvas.setFocus() : false;
-  }
-
   public void renameStep( StepMeta stepMeta, String stepname ) {
     String newname = stepname;
 
@@ -3017,8 +3011,13 @@ public class TransGraph extends AbstractGraph implements XulEventHandler, Redraw
               tip.append( "-" );
             }
             tip.append( Const.CR ).append( tipNext ).append( Const.CR );
-            tip.append( BaseMessages.getString( PKG, "TransGraph.DeprecatedStep.Tooltip.Message2",
-              iconStepMeta.getSuggestion() ) );
+            tip.append( BaseMessages.getString( PKG, "TransGraph.DeprecatedStep.Tooltip.Message2" ) );
+            if ( !Utils.isEmpty( iconStepMeta.getSuggestion() )
+              && !( iconStepMeta.getSuggestion().startsWith( "!" ) && iconStepMeta.getSuggestion().endsWith( "!" ) ) ) {
+              tip.append( " " );
+              tip.append( BaseMessages.getString( PKG, "TransGraph.DeprecatedStep.Tooltip.Message3",
+                iconStepMeta.getSuggestion() ) );
+            }
             tipImage = GUIResource.getInstance().getImageDeprecated();
             toolTip.setHideDelay( TOOLTIP_HIDE_DELAY_LONG );
           }

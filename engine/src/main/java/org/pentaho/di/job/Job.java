@@ -3,7 +3,7 @@
  *
  * Pentaho Data Integration
  *
- * Copyright (C) 2002-2018 by Hitachi Vantara : http://www.pentaho.com
+ * Copyright (C) 2002-2019 by Hitachi Vantara : http://www.pentaho.com
  *
  *******************************************************************************
  *
@@ -46,6 +46,7 @@ import org.apache.commons.vfs2.FileName;
 import org.apache.commons.vfs2.FileObject;
 import org.pentaho.di.cluster.SlaveServer;
 import org.pentaho.di.core.Const;
+import org.pentaho.di.core.util.ConnectionUtil;
 import org.pentaho.di.core.util.Utils;
 import org.pentaho.di.core.ExecutorInterface;
 import org.pentaho.di.core.ExtensionDataInterface;
@@ -374,6 +375,7 @@ public class Job extends Thread implements VariableSpace, NamedParams, HasLogCha
       setInternalKettleVariables( variables );
       copyParametersFrom( jobMeta );
       activateParameters();
+      ConnectionUtil.init( jobMeta );
 
       // Run the job
       //
@@ -405,6 +407,7 @@ public class Job extends Thread implements VariableSpace, NamedParams, HasLogCha
 
         ExtensionPointHandler.callExtensionPoint( log, KettleExtensionPoint.JobFinish.id, this );
         jobMeta.disposeEmbeddedMetastoreProvider();
+        log.logDebug( BaseMessages.getString( PKG, "Job.Log.DisposeEmbeddedMetastore" ) );
 
         fireJobFinishListeners();
 
@@ -518,7 +521,9 @@ public class Job extends Thread implements VariableSpace, NamedParams, HasLogCha
       log.logMinimal( BaseMessages.getString( PKG, "Job.Comment.JobFinished" ) );
 
       setActive( false );
-      setFinished( true );
+      if ( !isStopped() ) {
+        setFinished( true );
+      }
       return res;
     } finally {
       log.snap( Metrics.METRIC_JOB_STOP );
@@ -556,9 +561,12 @@ public class Job extends Thread implements VariableSpace, NamedParams, HasLogCha
       throw new KettleJobException( BaseMessages.getString( PKG, "Job.Log.CounldNotFindStartingPoint" ) );
     }
 
-    Result res = execute( nr, result, startpoint, null, BaseMessages.getString( PKG, "Job.Reason.StartOfJobentry" ) );
-    setActive( false );
-
+    JobEntrySpecial jes = (JobEntrySpecial) startpoint.getEntry();
+    Result res;
+    do {
+      res = execute( nr, result, startpoint, null, BaseMessages.getString( PKG, "Job.Reason.StartOfJobentry" ) );
+      setActive( false );
+    } while ( jes.isRepeat() && !isStopped() );
     return res;
   }
 
@@ -1412,7 +1420,8 @@ public class Job extends Thread implements VariableSpace, NamedParams, HasLogCha
    *          the new internal kettle variables.
    */
   public void setInternalKettleVariables( VariableSpace var ) {
-    if ( jobMeta != null && jobMeta.getFilename() != null ) { // we have a finename that's defined.
+    boolean hasFilename = jobMeta != null && !Utils.isEmpty( jobMeta.getFilename() );
+    if ( hasFilename ) { // we have a finename that's defined.
       try {
         FileObject fileObject = KettleVFS.getFileObject( jobMeta.getFilename(), this );
         FileName fileName = fileObject.getName();
@@ -1456,10 +1465,17 @@ public class Job extends Thread implements VariableSpace, NamedParams, HasLogCha
       if ( "/".equals( variables.getVariable( Const.INTERNAL_VARIABLE_ENTRY_CURRENT_DIRECTORY ) ) ) {
         variables.setVariable( Const.INTERNAL_VARIABLE_ENTRY_CURRENT_DIRECTORY, "" );
       }
-    } else {
-      variables.setVariable( Const.INTERNAL_VARIABLE_ENTRY_CURRENT_DIRECTORY, variables.getVariable(
-          Const.INTERNAL_VARIABLE_JOB_FILENAME_DIRECTORY ) );
     }
+
+    setInternalEntryCurrentDirectory( hasFilename, hasRepoDir );
+
+  }
+
+  protected void setInternalEntryCurrentDirectory( boolean hasFilename, boolean hasRepoDir  ) {
+    variables.setVariable( Const.INTERNAL_VARIABLE_ENTRY_CURRENT_DIRECTORY, variables.getVariable(
+      hasRepoDir ? Const.INTERNAL_VARIABLE_JOB_REPOSITORY_DIRECTORY
+        : hasFilename ? Const.INTERNAL_VARIABLE_JOB_FILENAME_DIRECTORY
+        : Const.INTERNAL_VARIABLE_ENTRY_CURRENT_DIRECTORY ) );
   }
 
   /*

@@ -2,7 +2,7 @@
  *
  * Pentaho Data Integration
  *
- * Copyright (C) 2002-2018 by Hitachi Vantara : http://www.pentaho.com
+ * Copyright (C) 2002-2019 by Hitachi Vantara : http://www.pentaho.com
  *
  *******************************************************************************
  *
@@ -174,8 +174,7 @@ public class DatabaseLookup extends BaseStep implements StepInterface {
       // Only verify the data types if the data comes from the DB, NOT when we have a cache hit
       // In that case, we already know the data type is OK.
       if ( !cacheHit ) {
-        incrementLinesInput();
-
+        incrementLines();
         int[] types = meta.getReturnValueDefaultType();
 
         // The assumption here is that the types are in the same order
@@ -208,15 +207,23 @@ public class DatabaseLookup extends BaseStep implements StepInterface {
     return outputRow;
   }
 
+  @VisibleForTesting
+  void incrementLines() {
+    if ( !getStepMeta().isClustered() || ( getStepMeta().isClustered() && !getTrans().isExecutingClustered() ) ) {
+      incrementLinesInput();
+    }
+  }
+
   // visible for testing purposes
   void determineFieldsTypesQueryingDb() throws KettleException {
     final String[] keyFields = meta.getTableKeyField();
     data.keytypes = new int[ keyFields.length ];
 
-    RowMetaInterface fields =
-      data.db.getTableFieldsMeta(
-        environmentSubstitute( meta.getSchemaName() ),
-        environmentSubstitute( meta.getTableName() ) );
+    String schemaTable =
+      meta.getDatabaseMeta().getQuotedSchemaTableCombination(
+        environmentSubstitute( meta.getSchemaName() ), environmentSubstitute( meta.getTablename() ) );
+
+    RowMetaInterface fields = data.db.getTableFields( schemaTable );
     if ( fields != null ) {
       // Fill in the types...
       for ( int i = 0; i < keyFields.length; i++ ) {
@@ -245,9 +252,6 @@ public class DatabaseLookup extends BaseStep implements StepInterface {
         }
       }
     } else {
-      String schemaTable =
-        meta.getDatabaseMeta().getQuotedSchemaTableCombination(
-          environmentSubstitute( meta.getSchemaName() ), environmentSubstitute( meta.getTablename() ) );
       throw new KettleStepException( BaseMessages.getString(
         PKG, "DatabaseLookup.ERROR0002.UnableToDetermineFieldsOfTable" )
         + schemaTable + "]" );

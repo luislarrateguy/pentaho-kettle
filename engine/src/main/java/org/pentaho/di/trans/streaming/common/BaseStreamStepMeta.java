@@ -2,7 +2,7 @@
  *
  * Pentaho Data Integration
  *
- * Copyright (C) 2002-2018 by Hitachi Vantara : http://www.pentaho.com
+ * Copyright (C) 2002-2019 by Hitachi Vantara : http://www.pentaho.com
  *
  *******************************************************************************
  *
@@ -37,6 +37,7 @@ import org.pentaho.di.i18n.BaseMessages;
 import org.pentaho.di.repository.Repository;
 import org.pentaho.di.resource.ResourceEntry;
 import org.pentaho.di.resource.ResourceReference;
+import org.pentaho.di.trans.ISubTransAwareMeta;
 import org.pentaho.di.trans.StepWithMappingMeta;
 import org.pentaho.di.trans.TransMeta;
 import org.pentaho.di.trans.step.StepMeta;
@@ -47,7 +48,7 @@ import org.pentaho.metastore.api.IMetaStore;
 import java.util.ArrayList;
 import java.util.List;
 
-public abstract class BaseStreamStepMeta extends StepWithMappingMeta implements StepMetaInterface {
+public abstract class BaseStreamStepMeta extends StepWithMappingMeta implements StepMetaInterface, ISubTransAwareMeta {
 
 
   private static final Class<?> PKG = BaseStreamStep.class;  // for i18n purposes, needed by Translator2!!   $NON-NLS-1$
@@ -55,6 +56,8 @@ public abstract class BaseStreamStepMeta extends StepWithMappingMeta implements 
   public static final String NUM_MESSAGES = "NUM_MESSAGES";
   public static final String DURATION = "DURATION";
   public static final String SUB_STEP = "SUB_STEP";
+  public static final String PARALLELISM = "PARALLELISM";
+  public static final String MESSAGE_DATA_TYPE = "MESSAGE_DATA_TYPE";
 
   @Injection ( name = TRANSFORMATION_PATH )
   protected String transformationPath = "";
@@ -67,6 +70,9 @@ public abstract class BaseStreamStepMeta extends StepWithMappingMeta implements 
 
   @Injection ( name = SUB_STEP )
   protected String subStep = "";
+
+  @Injection( name =  PARALLELISM )
+  protected String parallelism = "1";
 
   MappingMetaRetriever mappingMetaRetriever = TransExecutorMeta::loadMappingMeta;
 
@@ -95,9 +101,13 @@ public abstract class BaseStreamStepMeta extends StepWithMappingMeta implements 
     this.batchDuration = batchDuration;
   }
 
+  public void setParallelism( String parallelism ) {
+    this.parallelism = parallelism;
+  }
   @Override public void setDefault() {
     batchSize = "1000";
     batchDuration = "1000";
+    parallelism = "1";
   }
 
   public String getTransformationPath() {
@@ -110,6 +120,14 @@ public abstract class BaseStreamStepMeta extends StepWithMappingMeta implements 
 
   public String getBatchDuration() {
     return batchDuration;
+  }
+
+  public String getParallelism() {
+    return parallelism;
+  }
+
+  public int getMessageDataType() {
+    throw new UnsupportedOperationException();
   }
 
   @Override public void replaceFileName( String fileName ) {
@@ -146,6 +164,22 @@ public abstract class BaseStreamStepMeta extends StepWithMappingMeta implements 
         CheckResultInterface.TYPE_RESULT_ERROR,
         BaseMessages.getString( PKG, "BaseStreamStepMeta.CheckResult.NoBatchDefined" ),
         stepMeta ) );
+    }
+
+    try {
+      TransMeta subMeta = mappingMetaRetriever.get( this, repository, metaStore, space );
+      if ( !StringUtil.isEmpty( getSubStep() ) ) {
+        String realSubStepName = space.environmentSubstitute( getSubStep() );
+
+        if ( !subMeta.getSteps().stream().anyMatch( subStepMeta -> subStepMeta.getName().equals( realSubStepName ) ) ) {
+          remarks.add( new CheckResult(
+            CheckResultInterface.TYPE_RESULT_ERROR,
+            BaseMessages.getString( PKG, "BaseStreamStepMeta.CheckResult.ResultStepMissing", subMeta.getName(), realSubStepName ),
+            stepMeta ) );
+        }
+      }
+    } catch ( KettleException e ) {
+      getLog().logDebug( "Error loading subtrans meta", e );
     }
   }
 
@@ -194,18 +228,23 @@ public abstract class BaseStreamStepMeta extends StepWithMappingMeta implements 
       TransMeta transMeta = mappingMetaRetriever.get( this, repository, metaStore, space );
       if ( !StringUtil.isEmpty( getSubStep() ) ) {
         String realSubStepName = space.environmentSubstitute( getSubStep() );
-        rowMeta.addRowMeta( transMeta.getPrevStepFields( realSubStepName ) );
-        transMeta.getSteps().stream().filter( stepMeta -> stepMeta.getName().equals( realSubStepName ) )
-          .findFirst()
-          .ifPresent( stepMeta ->
-          {
-            try {
-              stepMeta.getStepMetaInterface()
-                .getFields( rowMeta, origin, info, nextStep, space, repository, metaStore );
-            } catch ( KettleStepException e ) {
-              throw new RuntimeException( e );
-            }
-          } );
+        if ( transMeta.getSteps().stream().anyMatch( stepMeta -> stepMeta.getName().equals( realSubStepName ) ) ) {
+          rowMeta.addRowMeta( transMeta.getPrevStepFields( realSubStepName ) );
+          transMeta.getSteps().stream().filter( stepMeta -> stepMeta.getName().equals( realSubStepName ) )
+            .findFirst()
+            .ifPresent( stepMeta ->
+            {
+              try {
+                stepMeta.getStepMetaInterface()
+                  .getFields( rowMeta, origin, info, nextStep, space, repository, metaStore );
+              } catch ( KettleStepException e ) {
+                throw new RuntimeException( e );
+              }
+            } );
+        } else {
+          throw new RuntimeException(
+            BaseMessages.getString( PKG, "BaseStreamStepMeta.CheckResult.ResultStepMissing", transMeta.getName(), realSubStepName ) );
+        }
       }
     } catch ( KettleException e ) {
       getLog().logDebug( "could not get fields, probable AEL" );

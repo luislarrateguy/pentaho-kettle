@@ -3,7 +3,7 @@
  *
  * Pentaho Data Integration
  *
- * Copyright (C) 2002-2018 by Hitachi Vantara : http://www.pentaho.com
+ * Copyright (C) 2002-2019 by Hitachi Vantara : http://www.pentaho.com
  *
  *******************************************************************************
  *
@@ -4721,8 +4721,9 @@ public class TransMeta extends AbstractMeta
             .getString( PKG, "TransMeta.Monitor.CheckingForDatabaseUnfriendlyCharactersInFieldNamesTask.Title" ) );
       }
       if ( values.size() > 0 ) {
-        for ( ValueMetaInterface v : values.keySet() ) {
-          String message = values.get( v );
+        for ( Map.Entry<ValueMetaInterface, String> entry : values.entrySet() ) {
+          String message = entry.getValue();
+          ValueMetaInterface v = entry.getKey();
           CheckResult
               cr =
               new CheckResult( CheckResultInterface.TYPE_RESULT_WARNING, BaseMessages
@@ -5656,9 +5657,8 @@ public class TransMeta extends AbstractMeta
       variables.setVariable( Const.INTERNAL_VARIABLE_JOB_REPOSITORY_DIRECTORY, "Parent Job Repository Directory" );
     }
 
-    variables.setVariable( Const.INTERNAL_VARIABLE_ENTRY_CURRENT_DIRECTORY,
-      variables.getVariable( repository != null ? Const.INTERNAL_VARIABLE_TRANSFORMATION_REPOSITORY_DIRECTORY
-        : Const.INTERNAL_VARIABLE_TRANSFORMATION_FILENAME_DIRECTORY ) );
+    setInternalEntryCurrentDirectory();
+
   }
 
   /**
@@ -5706,10 +5706,17 @@ public class TransMeta extends AbstractMeta
       variables.setVariable( Const.INTERNAL_VARIABLE_TRANSFORMATION_FILENAME_NAME, "" );
     }
 
-    variables.setVariable( Const.INTERNAL_VARIABLE_ENTRY_CURRENT_DIRECTORY,
-        variables.getVariable( repository != null ? Const.INTERNAL_VARIABLE_TRANSFORMATION_REPOSITORY_DIRECTORY
-          : Const.INTERNAL_VARIABLE_TRANSFORMATION_FILENAME_DIRECTORY ) );
+    setInternalEntryCurrentDirectory();
+
   }
+
+  protected void setInternalEntryCurrentDirectory() {
+    variables.setVariable( Const.INTERNAL_VARIABLE_ENTRY_CURRENT_DIRECTORY, variables.getVariable(
+      repository != null ?  Const.INTERNAL_VARIABLE_TRANSFORMATION_REPOSITORY_DIRECTORY
+        : filename != null ? Const.INTERNAL_VARIABLE_TRANSFORMATION_FILENAME_DIRECTORY
+        : Const.INTERNAL_VARIABLE_ENTRY_CURRENT_DIRECTORY ) );
+  }
+
 
   /**
    * Finds the mapping input step with the specified name. If no mapping input step is found, null is returned
@@ -5879,9 +5886,8 @@ public class TransMeta extends AbstractMeta
         //
         Map<String, String> directoryMap = resourceNamingInterface.getDirectoryMap();
         if ( directoryMap != null ) {
-          for ( String directory : directoryMap.keySet() ) {
-            String parameterName = directoryMap.get( directory );
-            transMeta.addParameterDefinition( parameterName, directory, "Data file path discovered during export" );
+          for ( Map.Entry<String, String> entry : directoryMap.entrySet() ) {
+            transMeta.addParameterDefinition( entry.getValue(), entry.getKey(), "Data file path discovered during export" );
           }
         }
 

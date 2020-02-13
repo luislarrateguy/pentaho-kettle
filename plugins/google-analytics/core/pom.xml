@@ -7,21 +7,20 @@
   <parent>
     <groupId>org.pentaho.di.plugins</groupId>
     <artifactId>google-analytics</artifactId>
-    <version>8.2.0.0-SNAPSHOT</version>
+    <version>9.0.0.0-SNAPSHOT</version>
   </parent>
 
   <artifactId>pdi-google-analytics-plugin-core</artifactId>
-  <version>8.2.0.0-SNAPSHOT</version>
+  <version>9.0.0.0-SNAPSHOT</version>
   <packaging>jar</packaging>
 
   <name>PDI Google Analytics Plugin Core</name>
 
   <properties>
-    <pdi.version>8.2.0.0-SNAPSHOT</pdi.version>
+    <pdi.version>9.0.0.0-SNAPSHOT</pdi.version>
     <commons-vfs2.version>2.2</commons-vfs2.version>
     <commons-codec.version>1.9</commons-codec.version>
     <commons-lang.version>2.6</commons-lang.version>
-    <commons-logging.version>1.2</commons-logging.version>
     <encoder.version>1.2</encoder.version>
     <javax.servlet-api.version>3.0.1</javax.servlet-api.version>
     <mockito-all.version>1.9.5</mockito-all.version>
@@ -29,8 +28,6 @@
     <timestamp>${maven.build.timestamp}</timestamp>
     <build.description>${project.description}</build.description>
     <maven.build.timestamp.format>yyyy/MM/dd hh:mm</maven.build.timestamp.format>
-    <slf4j-api.version>1.7.7</slf4j-api.version>
-    <slf4j-log4j12.version>1.7.7</slf4j-log4j12.version>
   </properties>
 
   <dependencies>
@@ -126,11 +123,6 @@
       </exclusions>
     </dependency>
     <dependency>
-      <groupId>org.apache.httpcomponents</groupId>
-      <artifactId>httpclient</artifactId>
-      <version>4.5.2</version>
-    </dependency>
-    <dependency>
       <groupId>commons-codec</groupId>
       <artifactId>commons-codec</artifactId>
       <version>${commons-codec.version}</version>
@@ -151,7 +143,6 @@
     <dependency>
       <groupId>commons-logging</groupId>
       <artifactId>commons-logging</artifactId>
-      <version>${commons-logging.version}</version>
     </dependency>
     <dependency>
       <groupId>org.mockito</groupId>
@@ -189,18 +180,6 @@
       <groupId>com.jcraft</groupId>
       <artifactId>jsch</artifactId>
       <version>0.1.54</version>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.slf4j</groupId>
-      <artifactId>slf4j-api</artifactId>
-      <version>${slf4j-api.version}</version>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.slf4j</groupId>
-      <artifactId>slf4j-log4j12</artifactId>
-      <version>${slf4j-log4j12.version}</version>
       <scope>test</scope>
     </dependency>
   </dependencies>
