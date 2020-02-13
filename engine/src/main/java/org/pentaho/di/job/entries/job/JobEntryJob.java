@@ -411,9 +411,9 @@ public class JobEntryJob extends JobEntryBase implements Cloneable, JobEntryInte
         if ( Utils.isEmpty( filename ) && !Utils.isEmpty( directory ) && !Utils.isEmpty( jobname ) ) {
           // this job was exported from a repository and is being loaded locally
           // need to create a well formatted filename
-          filename = directory + "/" + jobname;
-          if ( !filename.toLowerCase().endsWith( ".kjb" ) ) {
-            filename = filename + ".kjb";
+          filename = directory + RepositoryFile.SEPARATOR + jobname;
+          if ( !filename.toLowerCase().endsWith( RepositoryObjectType.JOB.getExtension() ) ) {
+            filename = filename + RepositoryObjectType.JOB.getExtension();
           }
         }
       }
@@ -974,6 +974,9 @@ public class JobEntryJob extends JobEntryBase implements Cloneable, JobEntryInte
               //
               if ( isPassingAllParameters() ) {
                 String parentValue = parentJob.getParameterValue( parameterNames[idx] );
+                if ( Utils.isEmpty( parentValue ) ) {
+                  parentValue = parentJob.getParameterDefault( parameterNames[idx] );
+                }
                 if ( !Utils.isEmpty( parentValue ) ) {
                   job.setParameterValue( parameterNames[idx], parentValue );
                 }

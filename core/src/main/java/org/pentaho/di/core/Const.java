@@ -741,6 +741,24 @@ public class Const {
   public static final String KETTLE_EMPTY_STRING_DIFFERS_FROM_NULL = "KETTLE_EMPTY_STRING_DIFFERS_FROM_NULL";
 
   /**
+   * This flag will prevent Kettle from converting {@code null} strings to empty strings in {@link org.pentaho.di.core.row.value.ValueMetaBase}
+   * The default value is {@code false}.
+   */
+  public static final String KETTLE_DO_NOT_NORMALIZE_NULL_STRING_TO_EMPTY = "KETTLE_DO_NOT_NORMALIZE_NULL_STRING_TO_EMPTY";
+
+  /**
+   * This flag will prevent Kettle from yielding {@code null} as the value of an empty XML tag in {@link org.pentaho.di.core.xml.XMLHandler}
+   * The default value is {@code false} and an empty XML tag will produce a {@code null} value.
+   */
+  public static final String KETTLE_XML_EMPTY_TAG_YIELDS_EMPTY_VALUE = "KETTLE_XML_EMPTY_TAG_YIELDS_EMPTY_VALUE";
+
+  /**
+   * This flag will cause the "Get XML data" step to yield null values on missing elements and empty values on empty elements when set to "Y".
+   * By default, both empty elements and missing elements will yield empty values.
+   */
+  public static final String KETTLE_XML_MISSING_TAG_YIELDS_NULL_VALUE = "KETTLE_XML_MISSING_TAG_YIELDS_NULL_VALUE";
+
+  /**
    * System wide flag to allow non-strict string to number conversion for backward compatibility. If this setting is set
    * to "Y", an string starting with digits will be converted successfully into a number. (example: 192.168.1.1 will be
    * converted into 192 or 192.168 depending on the decimal symbol). The default (N) will be to throw an error if
@@ -1339,6 +1357,36 @@ public class Const {
    */
   public static final String KETTLE_BIGDECIMAL_DIVISION_ROUNDING_MODE = "KETTLE_BIGDECIMAL_DIVISION_ROUNDING_MODE";
   public static final String KETTLE_BIGDECIMAL_DIVISION_ROUNDING_MODE_DEFAULT = "HALF_EVEN";
+
+  /**
+   * <p>This environment variable is used to define if a Timestamp should be converted to nanoseconds or
+   * milliseconds.</p>
+   * <p>By default, a Timestamp is in {@value #KETTLE_TIMESTAMP_OUTPUT_FORMAT_DEFAULT}.</p>
+   *
+   * @see #KETTLE_TIMESTAMP_OUTPUT_FORMAT_DEFAULT
+   * @see #KETTLE_TIMESTAMP_OUTPUT_FORMAT_MILLISECONDS
+   * @see #KETTLE_TIMESTAMP_OUTPUT_FORMAT_NANOSECONDS
+   */
+  public static final String KETTLE_TIMESTAMP_OUTPUT_FORMAT = "KETTLE_TIMESTAMP_OUTPUT_FORMAT";
+
+  /**
+   * <p>The value to use for setting the {@link #KETTLE_TIMESTAMP_OUTPUT_FORMAT} as nanoseconds.</p>
+   *
+   * @see #KETTLE_TIMESTAMP_OUTPUT_FORMAT_MILLISECONDS
+   */
+  public static final String KETTLE_TIMESTAMP_OUTPUT_FORMAT_NANOSECONDS = "NANOSECONDS";
+
+  /**
+   * <p>The value to use for setting the {@link #KETTLE_TIMESTAMP_OUTPUT_FORMAT} as milliseconds.</p>
+   *
+   * @see #KETTLE_TIMESTAMP_OUTPUT_FORMAT_NANOSECONDS
+   */
+  public static final String KETTLE_TIMESTAMP_OUTPUT_FORMAT_MILLISECONDS = "MILLISECONDS";
+
+  /**
+   * <p>The default value for the {@link #KETTLE_TIMESTAMP_OUTPUT_FORMAT}.</p>
+   */
+  public static final String KETTLE_TIMESTAMP_OUTPUT_FORMAT_DEFAULT = KETTLE_TIMESTAMP_OUTPUT_FORMAT_NANOSECONDS;
 
   /**
    * rounds double f to any number of places after decimal point Does arithmetic using BigDecimal class to avoid integer
