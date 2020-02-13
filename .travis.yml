@@ -9,4 +9,4 @@ cache:
   directories:
   - $HOME/.m2
 
-install: mvn clean install -q -s settings.xml -DskipTests=true
+install: travis_wait 60 mvn clean install -q -s settings.xml -DskipTests=true
